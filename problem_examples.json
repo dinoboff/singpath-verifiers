@@ -1,0 +1,54 @@
+{
+  "java": {
+    "pass_eample": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "fail_example": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 3);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": false
+    },
+    "compile_error": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0\n   }\n} \n",
+      "is_solved": true
+    },
+    "3": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "4": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "5": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "6": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "7": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "8": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    },
+    "9": {
+      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
+      "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
+      "is_solved": true
+    }
+  }
+}
