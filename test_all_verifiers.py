@@ -20,8 +20,9 @@ if len(sys.argv) > 1 and sys.argv[1]=='local':
     run_local = True
 
 docker_verifier_images = {}
+docker_verifier_images['example']= "library/python"
+docker_verifier_images['python']= "library/python"
 #docker_verifier_images['java']= ""
-#docker_verifier_images['python']= ""
 #docker_verifier_images['javascript']= ""
 
 # Write out tests from string
@@ -42,19 +43,25 @@ def run_secure_verifier(directory):
         os.chdir(savedPath)
         
     else: 
-        #local_dir = os.getcwd()+"/"+directory
         local_dir = os.getcwd()+"/"+directory
-        
+        # Find the container to download and use when calling docker run. 
+        docker_container = docker_verifier_images[directory]
         remote_dir = "data"
         print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
        
-        docker_command = 'docker run -v '+local_dir+':/data library/python python data/verify.py'
-        
+        # We will assume that all verifier containers will support python and call the verify.py created for each language. 
+        docker_command = 'docker run -v '+local_dir+':/data '+docker_container+' python data/verify.py'
+
+        # Will call Docker using subprocess and capture the output. 
+        # Todo: handle errors and support timeouts. 
         import subprocess
-        result = subprocess.check_output(docker_command, shell=True)
-        #result = os.system(docker_command)
-        data = json.loads(result.decode())
-        print("The returned result was {}".format(data))
+        try: 
+            result = subprocess.check_output(docker_command, shell=True)
+            data = json.loads(result.decode())
+        except e: 
+            data = {"errors": "An error occurred when calling the verifier. {}".format(str(e))}   
+        
+        print("The result returned from the verifier was {}".format(data))
         return data
  
     
@@ -90,11 +97,20 @@ for language in ['example']:#examples.keys():
     result = run_secure_verifier( directory=language)
     #result = read_results( directory=language)
     
-    if result['solved'] != example['is_solved']:
-
-        test_results[language].append("Failed - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
-    else:
-        test_results[language].append("Passed".format(key))
+    if "solved" in result:
+        if result['solved'] != example['is_solved']:
+    
+            test_results[language].append("Failed - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
+        else:
+            test_results[language].append("Passed".format(key))
+    elif "errors" in result:
+        if "returns_error" in example:
+            test_results[language].append("Passed".format(key))
+        else:
+            test_results[language].append("Unexpected errors returned.")
+    else: 
+        test_results[language].append("The verifier did not return solved or errors")
+        
 
 print("-----------------")
 print("Problem Examples Test Results")

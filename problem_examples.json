@@ -9,6 +9,12 @@
       "tests": "",
       "solution": "fail",
       "is_solved": false
+    },
+    "error_example": {
+      "tests": "",
+      "solution": "error",
+      "is_solved": false,
+      "returns_error": true
     }
   },
   "java": {

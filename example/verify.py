@@ -23,6 +23,8 @@ def get_results():
 	# Make the result solved=False if the solution contains the text "fail"
 	if "fail" in solution_text:
 		results["solved"] = False
+	elif "error" in solution_text:
+		results = {"errors": "This is an example of an error."}
 		
 	return json.dumps(results)
 
