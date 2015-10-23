@@ -49,9 +49,6 @@ def java_compile():
     try:
         cmnd_output = subprocess.check_output('javac -cp "junit-4.10.jar:json-simple.jar" *.java',stderr=subprocess.STDOUT, shell=True)          
     except subprocess.CalledProcessError as exc:                                                                                                   
-        #print("Status : FAIL", exc.returncode, exc.output)
-        #print("Fail return code {}".format(exc.returncode))
-        #print("Fail error output {}".format(exc.output))
         return "Compile failed {}".format(exc.output)
     else:                                                                                                   
         pass
@@ -68,8 +65,12 @@ def check_results():
     with open('results.json') as data_file:    
         data = json.load(data_file)
     #print("There are {} keys in the json output".format(len(data.keys())))
-    print("Verifier results were {}.".format(data['solved']))
+    #print("Verifier results were {}.".format(data['solved']))
     #print("Results {}".format(data['results']))
+    return json.dumps(data)
+
+# ---- switch to the data directory before starting. -----
+os.chdir("data")
 
 write_solution()
 write_tests()
@@ -84,4 +85,5 @@ else:
     with open("results.json", 'w') as outfile:
         json.dump(data, outfile) 
 
-check_results()
+print(check_results())
+

@@ -22,7 +22,7 @@ if len(sys.argv) > 1 and sys.argv[1]=='local':
 docker_verifier_images = {}
 docker_verifier_images['example']= "library/python"
 docker_verifier_images['python']= "library/python"
-#docker_verifier_images['java']= ""
+docker_verifier_images['java']= "library/java"
 #docker_verifier_images['javascript']= ""
 
 # Write out tests from string
@@ -58,8 +58,8 @@ def run_secure_verifier(directory):
         try: 
             result = subprocess.check_output(docker_command, shell=True)
             data = json.loads(result.decode())
-        except e: 
-            data = {"errors": "An error occurred when calling the verifier. {}".format(str(e))}   
+        except: 
+            data = {"errors": "An error occurred when calling the verifier. {}".format(str("TBD"))}   
         
         print("The result returned from the verifier was {}".format(data))
         return data
@@ -84,7 +84,7 @@ with open('problem_examples.json') as data_file:
 
 # Iterterate through each language and call the language verify.py in each directory. 
 test_results = {}
-for language in ['example']:#examples.keys():
+for language in examples.keys():
   if not "language" in test_results.keys():
       test_results[language] = []  
   for key in examples[language].keys():
@@ -102,14 +102,14 @@ for language in ['example']:#examples.keys():
     
             test_results[language].append("Failed - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
         else:
-            test_results[language].append("Passed".format(key))
+            test_results[language].append("Passed {} -> {}".format(language, key))
     elif "errors" in result:
         if "returns_error" in example:
-            test_results[language].append("Passed".format(key))
+            test_results[language].append("Passed {} -> {}".format(language, key))
         else:
-            test_results[language].append("Unexpected errors returned.")
+            test_results[language].append("Unexpected errors returned {} -> {}".format(langauge,key))
     else: 
-        test_results[language].append("The verifier did not return solved or errors")
+        test_results[language].append("The verifier did not return solved or errors {} -> {}".format(langauge, key))
         
 
 print("-----------------")

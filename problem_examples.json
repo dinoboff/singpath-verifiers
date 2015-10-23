@@ -31,7 +31,7 @@
     "compile_error": {
       "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
       "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0\n   }\n} \n",
-      "is_solved": true
+      "is_solved": false
     },
     "3": {
       "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
