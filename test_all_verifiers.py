@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from sys import platform as _platform
 
 """
 This script will mainly write out each problem and solution, run the docker verify command, collect the solution, 
@@ -12,6 +13,10 @@ You should be able to check all of the docker verifiers at once.
 There can be 2 scripts - run all of these from subfolders on the local machine. 
 Then one to run all of the problem in their docker containers. 
 """
+# We need to add sudo when running docker on linux systems. 
+dstart = ""
+if _platform=='linux2': 
+    dstart = "sudo "
 
 run_local = False
 
@@ -51,7 +56,7 @@ def run_secure_verifier(directory):
        
         # We will assume that all verifier containers will support python and call the verify.py created for each language. 
         
-        docker_command = 'docker run -v '+local_dir+':/data '+docker_container+' python data/verify.py'
+        docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' python data/verify.py'
 
         # Will call Docker using subprocess and capture the output. 
         # Todo: handle errors and support timeouts. 
