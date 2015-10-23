@@ -1,6 +1,18 @@
 {
+  "example": {
+    "pass_example": {
+      "tests": "",
+      "solution": "pass",
+      "is_solved": true
+    },
+    "fail_example": {
+      "tests": "",
+      "solution": "fail",
+      "is_solved": false
+    }
+  },
   "java": {
-    "pass_eample": {
+    "pass_example": {
       "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
       "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
       "is_solved": true

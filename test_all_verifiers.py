@@ -13,11 +13,11 @@ There can be 2 scripts - run all of these from subfolders on the local machine.
 Then one to run all of the problem in their docker containers. 
 """
 
-run_in_containers = False
+run_local = False
 
-if len(sys.argv) > 1 and sys.argv[1]=='run_in_containers':
-    print("Testing containers.")
-    run_in_containers = True
+if len(sys.argv) > 1 and sys.argv[1]=='local':
+    print("Testing locally.")
+    run_local = True
 
 docker_verifier_images = {}
 #docker_verifier_images['java']= ""
@@ -34,19 +34,29 @@ def write_test(test_code, directory):
         the_file.write(test_code)
         
 def run_secure_verifier(directory):
-    if run_in_containers:
-        print("Container execution still under development.")
-        # mount the directory to read problem.txt and solution.txt from. 
-        # docker run java_conatainer python verify.py
-        # read the results.json from container
-        # shutdown ccontainer
-        
-    else: 
+    if run_local:
         # Test the verify.py scripts for each language in local subdirectories on a test system. 
         savedPath = os.getcwd()
         os.chdir(directory)
         os.system('python verify.py')
         os.chdir(savedPath)
+        
+    else: 
+        #local_dir = os.getcwd()+"/"+directory
+        local_dir = os.getcwd()+"/"+directory
+        
+        remote_dir = "data"
+        print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
+       
+        docker_command = 'docker run -v '+local_dir+':/data library/python python data/verify.py'
+        
+        import subprocess
+        result = subprocess.check_output(docker_command, shell=True)
+        #result = os.system(docker_command)
+        data = json.loads(result.decode())
+        print("The returned result was {}".format(data))
+        return data
+ 
     
 def read_results(directory):
     target = directory+'/results.json'
@@ -67,8 +77,8 @@ with open('problem_examples.json') as data_file:
 
 # Iterterate through each language and call the language verify.py in each directory. 
 test_results = {}
-for language in examples.keys():
-  if not test_results.has_key(language):
+for language in ['example']:#examples.keys():
+  if not "language" in test_results.keys():
       test_results[language] = []  
   for key in examples[language].keys():
     example = examples[language][key]
@@ -77,10 +87,9 @@ for language in examples.keys():
     write_test(example['tests'],  directory=language)
     
     # run the verifier. 
-    run_secure_verifier( directory=language)
-    result = read_results( directory=language)
+    result = run_secure_verifier( directory=language)
+    #result = read_results( directory=language)
     
-
     if result['solved'] != example['is_solved']:
 
         test_results[language].append("Failed - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
@@ -91,6 +100,6 @@ print("-----------------")
 print("Problem Examples Test Results")
 for language in test_results.keys(): 
     for result in test_results[language]: 
-        print result
+        print(result)
 
 

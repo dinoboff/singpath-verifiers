@@ -1,5 +1,8 @@
 # This is the script intended to be run inside a secured docker container. 
 # This script compiles and runs Java code. 
+
+#Todo: Update the verifier to return JSON data rather than write it to a file. 
+
 import json
 import os
 import subprocess
