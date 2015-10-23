@@ -2,7 +2,7 @@
 # Verifiers can not print() to standard out since everything printed is going to back to the 
 # caller as a json string. Include debug information if you want to be able to monitor and debug 
 # variables in the container. Extra keys in solutions will just be ignored. 
-import sys
+#import sys
 import os
 import json
 
@@ -29,6 +29,7 @@ def get_results():
 	return json.dumps(results)
 
 if __name__ == '__main__':
-    sys.stdout.write("{}\n".format(get_results()))
-	#exit(get_results()) 
+    #sys.stdout.write( get_results() )
+	print( get_results() )
+
 

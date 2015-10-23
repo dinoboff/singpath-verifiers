@@ -47,13 +47,15 @@ def run_secure_verifier(directory):
         # Find the container to download and use when calling docker run. 
         docker_container = docker_verifier_images[directory]
         remote_dir = "data"
-        print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
+        #print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
        
         # We will assume that all verifier containers will support python and call the verify.py created for each language. 
+        
         docker_command = 'docker run -v '+local_dir+':/data '+docker_container+' python data/verify.py'
 
         # Will call Docker using subprocess and capture the output. 
         # Todo: handle errors and support timeouts. 
+        print("Running command -> {}".format(docker_command))
         import subprocess
         try: 
             result = subprocess.check_output(docker_command, shell=True)
