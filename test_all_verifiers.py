@@ -109,9 +109,9 @@ for language in examples.keys():
         if "returns_error" in example:
             test_results[language].append("Passed {} -> {}".format(language, key))
         else:
-            test_results[language].append("Unexpected errors returned {} -> {}".format(langauge,key))
+            test_results[language].append("Unexpected errors returned {} -> {}".format(language,key))
     else: 
-        test_results[language].append("The verifier did not return solved or errors {} -> {}".format(langauge, key))
+        test_results[language].append("The verifier did not return solved or errors {} -> {}".format(language, key))
         
 
 print("-----------------")
