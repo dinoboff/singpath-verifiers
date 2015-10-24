@@ -57,6 +57,8 @@ def run_secure_verifier(directory):
        
         # We will assume that all verifier containers will support python and call the verify.py created for each language. 
         
+        # Read only host folder
+        #docker_command = dstart +'docker run -v '+local_dir+':/data:ro '+docker_container+' '+command
         docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' '+command
 
         # Will call Docker using subprocess and capture the output. 
