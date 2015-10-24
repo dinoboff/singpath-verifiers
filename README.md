@@ -18,16 +18,20 @@ Here is a passing example with solved==True
 {'results': [{'expected': 2, 'call': 'x', 'correct': True, 'received': '2'}], 'printed': '99\n', 'solved': True}
 
 And here is an example with a passing tests and failing test. 
+
 {'results': [{'call': 'x', 'expected': 2, 'received': '2', 'correct': True}, 
              {'call': 'y', 'expected': 3, 'received': '2', 'correct': False}],
 'printed': '', 
 'solved': False,}
 
+
 These results from verifying code are usually used to build a table to provide feedback to users. 
 
-Called  Expected  Recieved  Correct
-x       2         2         True
-y       3         2         False
+| Called | Expected | Recieved  | Correct |
+| ------ |:--------:| :--------:|:--------|
+| x      | 2        | 2         | True    |
+| y      | 3        | 2         | False   |
+
 
 
 
