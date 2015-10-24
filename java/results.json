@@ -1,1 +1,1 @@
-{"solved": false, "results": [["Compile error", 0, "Compile failed SingPath.java:4: error: ';' expected\n      return 2.0\n                ^\n1 error\n", "fail"]]}
+{"run_time":18,"solved":true,"results":[],"run_count":1}

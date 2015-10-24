@@ -28,7 +28,7 @@ docker_verifier_images = {}
 docker_verifier_images['example']= {"image":"library/python","command":"python data/verify.py"}
 docker_verifier_images['python']= {"image":"library/python","command":"python data/verify.py"}
 docker_verifier_images['java']= {"image":"library/java","command":"python data/verify.py"}
-#docker_verifier_images['javascript']= {"image":"node","command":"node data/verify.js"}
+docker_verifier_images['javascript']= {"image":"node","command":"node data/verify.js"}
 
 # Write out tests from string
 def write_solution(solution_code,  directory):        
