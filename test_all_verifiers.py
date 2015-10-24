@@ -25,10 +25,10 @@ if len(sys.argv) > 1 and sys.argv[1]=='local':
     run_local = True
 
 docker_verifier_images = {}
-docker_verifier_images['example']= "library/python"
-docker_verifier_images['python']= "library/python"
-docker_verifier_images['java']= "library/java"
-#docker_verifier_images['javascript']= ""
+docker_verifier_images['example']= {"image":"library/python","command":"python data/verify.py"}
+docker_verifier_images['python']= {"image":"library/python","command":"python data/verify.py"}
+docker_verifier_images['java']= {"image":"library/java","command":"python data/verify.py"}
+#docker_verifier_images['javascript']= {"image":"node","command":"node data/verify.js"}
 
 # Write out tests from string
 def write_solution(solution_code,  directory):        
@@ -50,13 +50,14 @@ def run_secure_verifier(directory):
     else: 
         local_dir = os.getcwd()+"/"+directory
         # Find the container to download and use when calling docker run. 
-        docker_container = docker_verifier_images[directory]
+        docker_container = docker_verifier_images[directory]["image"]
+        command = docker_verifier_images[directory]["command"]
         remote_dir = "data"
         #print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
        
         # We will assume that all verifier containers will support python and call the verify.py created for each language. 
         
-        docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' python data/verify.py'
+        docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' '+command
 
         # Will call Docker using subprocess and capture the output. 
         # Todo: handle errors and support timeouts. 

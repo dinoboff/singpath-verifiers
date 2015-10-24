@@ -1,13 +1,13 @@
 {
   "python": {
     "pass_example": {
-      "tests": ">>> x\n 2",
-      "solution": "x=2",
+      "tests": ">>> x\n 2\n>>> y\n 3",
+      "solution": "x=2\ny=3",
       "is_solved": true
     },
     "fail_example": {
-      "tests": ">>> x\n 2",
-      "solution": "x=3",
+      "tests": ">>> x\n 2\n>>> y\n 3",
+      "solution": "x=2\ny=2",
       "is_solved": false
     },
     "error_example": {
