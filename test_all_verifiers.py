@@ -110,7 +110,7 @@ for language in examples.keys():
     if "solved" in result:
         if result['solved'] != example['is_solved']:
     
-            test_results[language].append("Failed - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
+            test_results[language].append("**Failed** - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
         else:
             test_results[language].append("Passed {} -> {}".format(language, key))
     elif "errors" in result:

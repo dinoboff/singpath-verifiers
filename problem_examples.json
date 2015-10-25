@@ -43,9 +43,14 @@
   },
   "java": {
     "stream": {
-      "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
-      "solution": "import java.util.*;\nimport java.util.stream.*;\n\npublic class SingPath {\n   public Double add() {long count = Arrays.asList(\"a4\").stream().count();;\n      return 2.0;\n   }\n} \n",
+      "tests": "\n   public void testExample(){SingPath sp = new SingPath();\nassertEquals(3 , sp.add());\n   }\n",
+      "solution": "import java.util.*;\nimport java.util.stream.*;\n\npublic class SingPath {\n   public long add() {long count = Arrays.asList(1,2,3).stream().count();\n  return count;\n   }\n} \n",
       "is_solved": true
+    },
+    "stream_fail": {
+      "tests": "\n   public void testExample(){SingPath sp = new SingPath();\nassertEquals(3 , sp.add());\n   }\n",
+      "solution": "import java.util.*;\nimport java.util.stream.*;\n\npublic class SingPath {\n   public long add() {long count = Arrays.asList(1).stream().count();\n  return count;\n   }\n} \n",
+      "is_solved": false
     },
     "3": {
       "tests": "\n   public void testExample(){\n      assertEquals(2 , 2);\n   }\n",
