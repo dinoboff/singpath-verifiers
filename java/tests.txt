@@ -1,4 +1,1 @@
-
-   public void testExample(){
-      assertEquals(2 , 2);
-   }
+assertEquals(2 , 2);

@@ -15,10 +15,8 @@ import static org.junit.Assert.*;
 import junit.framework.*;
 public class SingPathTest extends TestCase {
 
-   //public void testExample(){
-   //   assertEquals(2 , 2);
-   //}
-
+public void testExample(){
+//assertEquals(2 , 2);   
 """
 
 # Write out tests from string
@@ -37,7 +35,7 @@ def write_tests():
     with open('tests.txt', 'r') as tests:
         test_code = tests.read()
     
-    content = junit_test_begin + "\n" + test_code + "\n}"
+    content = junit_test_begin + "\n" + test_code + "\n}\n}"
     
     with open('SingPathTest.java', 'w') as the_file:
         the_file.write(content)
