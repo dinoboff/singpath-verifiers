@@ -6,6 +6,7 @@
 import json
 import os
 import subprocess
+import shutil
 
 # Script expects to to find TestRunner.java and/or TestRunner.class in the directory. 
 
@@ -18,6 +19,9 @@ public class SingPathTest extends TestCase {
 public void testExample(){
 //assertEquals(2 , 2);   
 """
+read_only_directory = "data"
+execution_directory = "java_data"
+
 
 # Write out tests from string
 def write_solution():
@@ -67,8 +71,12 @@ def check_results():
     #print("Results {}".format(data['results']))
     return json.dumps(data)
 
+# Copy data to a writable directory. 
+
+shutil.copytree(read_only_directory, execution_directory)
 # ---- switch to the data directory before starting. -----
-os.chdir("data")
+
+os.chdir(execution_directory)
 
 write_solution()
 write_tests()

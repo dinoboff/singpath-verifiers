@@ -4,26 +4,31 @@ import json
 import os
 import sys
 from sys import platform as _platform
+import shutil
+import datetime
 
 """
 This script will mainly write out each problem and solution, run the docker verify command, collect the solution, 
 and then compare the results.
 You should be able to check all of the docker verifiers at once. 
 
-There can be 2 scripts - run all of these from subfolders on the local machine. 
-Then one to run all of the problem in their docker containers. 
+Todo: 
+    run the languages in parrallel. 
+    next look at running 2 copies of each language in parrallel in subfolders. (java-1, java-2)
 """
+parallelism = 1
+if len(sys.argv) > 1:
+    parallelism = int(sys.argv[1])
+    print("Running in parallel with parallelism {}".format(parallelism))
+    
+MAX_SECONDS = 30
+
 # We need to add sudo when running docker on linux systems. 
 dstart = ""
 if _platform=='linux2': 
     dstart = "sudo "
 
-run_local = False
-
-if len(sys.argv) > 1 and sys.argv[1]=='local':
-    print("Testing locally.")
-    run_local = True
-
+    
 docker_verifier_images = {}
 docker_verifier_images['example']= {"image":"library/python","command":"python data/verify.py"}
 docker_verifier_images['python']= {"image":"library/python","command":"python data/verify.py"}
@@ -39,73 +44,68 @@ def write_test(test_code, directory):
     with open(directory+'/tests.txt', 'w') as the_file:
         the_file.write(test_code)
         
-def run_secure_verifier(directory):
-    if run_local:
-        # Test the verify.py scripts for each language in local subdirectories on a test system. 
-        savedPath = os.getcwd()
-        os.chdir(directory)
-        os.system('python verify.py')
-        os.chdir(savedPath)
-        
-    else: 
+def run_secure_verifier(directory, language):
         local_dir = os.getcwd()+"/"+directory
         # Find the container to download and use when calling docker run. 
-        docker_container = docker_verifier_images[directory]["image"]
-        command = docker_verifier_images[directory]["command"]
+        docker_container = docker_verifier_images[language]["image"]
+        command = docker_verifier_images[language]["command"]
         remote_dir = "data"
-        #print("Under development. Mounting directory {} to remote directory  {}".format(local_dir, remote_dir))
-       
-        # We will assume that all verifier containers will support python and call the verify.py created for each language. 
-        
+
         # Read only host folder
-        #docker_command = dstart +'docker run -v '+local_dir+':/data:ro '+docker_container+' '+command
-        docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' '+command
+        docker_command = dstart +'docker run -v '+local_dir+':/data:ro '+docker_container+' '+command
+        #docker_command = dstart +'docker run -v '+local_dir+':/data '+docker_container+' '+command
 
         # Will call Docker using subprocess and capture the output. 
         # Todo: handle errors and support timeouts. 
         print("Running command -> {}".format(docker_command))
         import subprocess
-        try: 
-            result = subprocess.check_output(docker_command, shell=True)
-            data = json.loads(result.decode())
-        except: 
-            data = {"errors": "An error occurred when calling the verifier. {}".format(str("TBD"))}   
         
+        # This will need to be returned to run in parallel. 
+        result = None
+        try:
+           result = subprocess.check_output(docker_command, shell=True, timeout=MAX_SECONDS)
+        except:   
+           result = "TIMEOUT" 
+    
+        data = None
+        if result == "TIMEOUT":
+            data = {"errors": "Code took too long to run. {}".format(str("TBD"))}
+
+        else: 
+            try:
+                data = json.loads(result.decode())
+            except:
+                data = {"errors": "An error occurred when calling the verifier. {}".format(str("TBD"))}   
+                    
         print("The result returned from the verifier was {}".format(data))
         return data
  
-    
-def read_results(directory):
-    target = directory+'/results.json'
-    if os.path.exists(target):
-        with open(target) as data_file:    
-            results = json.load(data_file)
-        return results
-    else: 
-        # Write out a no results returned error. 
-        data = {"solved":False, 
-                "results": [["Verifier did not return a result", 0, compile_result, "fail"]]}
-        with open("results.json", 'w') as outfile:
-            json.dump(data, outfile) 
-
 # Load problem examples
 with open('problem_examples.json') as data_file:    
     examples = json.load(data_file)
 
-# Iterterate through each language and call the language verify.py in each directory. 
-test_results = {}
-for language in examples.keys():
-  if not "language" in test_results.keys():
-      test_results[language] = []  
-  for key in examples[language].keys():
+def setup_and_verify(language, key):
+    # Run all of this in parallel in threads. 
+    working_directory = language+"_"+key
+    # copy all files to a new directory. 
+    # delete the working directory if it exists. 
+    if os.path.isdir(working_directory):
+        shutil.rmtree(working_directory)
+    
+    shutil.copytree(language,working_directory)
+    
     example = examples[language][key]
     # write out problem.txt and tests.txt in the target directory. 
-    write_solution(example['solution'], directory=language)
-    write_test(example['tests'],  directory=language)
+    write_solution(example['solution'], directory=working_directory)
+    
+    write_test(example['tests'],  directory=working_directory)
     
     # run the verifier. 
-    result = run_secure_verifier( directory=language)
-    #result = read_results( directory=language)
+    result = run_secure_verifier( directory=working_directory, language=language)
+    
+    # Remove the temporary working directory. 
+    if os.path.isdir(working_directory):
+        shutil.rmtree(working_directory)
     
     if "solved" in result:
         if result['solved'] != example['is_solved']:
@@ -120,12 +120,61 @@ for language in examples.keys():
             test_results[language].append("Unexpected errors returned {} -> {}".format(language,key))
     else: 
         test_results[language].append("The verifier did not return solved or errors {} -> {}".format(language, key))
-        
+
+def func1(a,b):
+    print(a+"->"+b)
+    
+# Iterterate through each language and call the language verify.py in each directory. 
+test_results = {}
+
+#Create working directories with name language-problemkey
+start_time = datetime.datetime.now()
+
+threads = []
+
+for language in examples.keys():
+  if not "language" in test_results.keys():
+      test_results[language] = []  
+  for key in examples[language].keys():
+      
+      # This needs to be run in parallel. 
+      import threading
+      t1 = threading.Thread(target=setup_and_verify, args=(language, key))
+      #t1.start()
+      threads.append(t1)
+      #t1.join()
+ 
+# We can pace how many threads are started and active at any given time.  
+print("Running with parallelism {}".format(parallelism)) 
+blocks = len(threads)/parallelism
+while len(threads) >= parallelism:
+    print("Total threads = {}".format(len(threads)))
+    for x in range(parallelism):
+        threads[x].start()
+
+    for x in range(parallelism):
+        threads[x].join()
+    
+    for x in range(parallelism):
+        del threads[0]
+
+# Clean up remaining threads
+if len(threads) > 0:
+    print("Cleaning up. Total threads = {}".format(len(threads)))
+    for x in range(len(threads)):
+        threads[x].start()
+    for x in range(len(threads)):
+        threads[x].join() 
+    for x in range(len(threads)):
+        del threads[0]   
+
+stop_time = datetime.datetime.now()        
 
 print("-----------------")
 print("Problem Examples Test Results")
 for language in test_results.keys(): 
     for result in test_results[language]: 
         print(result)
-
+print()
+print("Running all tests took {}.".format(stop_time - start_time))
 
