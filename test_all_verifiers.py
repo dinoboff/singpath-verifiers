@@ -6,17 +6,16 @@ import sys
 from sys import platform as _platform
 import shutil
 import datetime
+import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
 
 """
 This script will mainly write out each problem and solution, run the docker verify command, collect the solution, 
 and then compare the results.
 You should be able to check all of the docker verifiers at once. 
 
-Todo: 
-    run the languages in parrallel. 
-    next look at running 2 copies of each language in parrallel in subfolders. (java-1, java-2)
 """
-parallelism = 1
+parallelism = mp.cpu_count()
 if len(sys.argv) > 1:
     parallelism = int(sys.argv[1])
     print("Running in parallel with parallelism {}".format(parallelism))
@@ -28,7 +27,6 @@ dstart = ""
 if _platform=='linux2': 
     dstart = "sudo "
 
-    
 docker_verifier_images = {}
 docker_verifier_images['example']= {"image":"library/python","command":"python data/verify.py"}
 docker_verifier_images['python']= {"image":"library/python","command":"python data/verify.py"}
@@ -120,9 +118,7 @@ def setup_and_verify(language, key):
             test_results[language].append("Unexpected errors returned {} -> {}".format(language,key))
     else: 
         test_results[language].append("The verifier did not return solved or errors {} -> {}".format(language, key))
-
-def func1(a,b):
-    print(a+"->"+b)
+    return "Done"
     
 # Iterterate through each language and call the language verify.py in each directory. 
 test_results = {}
@@ -130,7 +126,13 @@ test_results = {}
 #Create working directories with name language-problemkey
 start_time = datetime.datetime.now()
 
-threads = []
+pool = ThreadPool(processes=parallelism)
+
+# Keep track of all the async worker processes by the (language,key) folder they are using. 
+workers = {}
+
+# We can pace how many threads are started and active at any given time.  
+print("Running with parallelism {}".format(parallelism)) 
 
 for language in examples.keys():
   if not "language" in test_results.keys():
@@ -138,35 +140,31 @@ for language in examples.keys():
   for key in examples[language].keys():
       
       # This needs to be run in parallel. 
-      import threading
-      t1 = threading.Thread(target=setup_and_verify, args=(language, key))
-      #t1.start()
-      threads.append(t1)
-      #t1.join()
- 
-# We can pace how many threads are started and active at any given time.  
-print("Running with parallelism {}".format(parallelism)) 
-blocks = len(threads)/parallelism
-while len(threads) >= parallelism:
-    print("Total threads = {}".format(len(threads)))
-    for x in range(parallelism):
-        threads[x].start()
+      async_result = pool.apply_async(setup_and_verify, (language, key))
+      workers[(language,key)] = async_result
 
-    for x in range(parallelism):
-        threads[x].join()
+for worker_key in workers:
+    return_val = workers[worker_key].get()
+    #print("From worker {}".format(return_val))  
     
-    for x in range(parallelism):
-        del threads[0]
-
-# Clean up remaining threads
-if len(threads) > 0:
-    print("Cleaning up. Total threads = {}".format(len(threads)))
-    for x in range(len(threads)):
-        threads[x].start()
-    for x in range(len(threads)):
-        threads[x].join() 
-    for x in range(len(threads)):
-        del threads[0]   
+""" 
+# We may want to loop through all results and pickout the ones that have finshed to reply to them faster. 
+# There may be a long running test issue that we would not want to block other processes. 
+# We could also periodically place additional items in the workers dictionary. 
+keys_to_delete = []
+while len(workers.keys()) > 0:
+  for worker_key in workers.keys(): 
+    if workers[worker_key].ready():  
+        print("Found a finished worker. active workers {}".format(len(workers)))
+        return_val = workers[worker_key].get()
+        print("From worker {}".format(return_val))  
+        keys_to_delete.append(worker_key)
+  
+  # Remove all the workers that have finished.       
+  for worker_key in keys_to_delete:
+    del workers[worker_key]
+  keys_to_delete = []
+"""
 
 stop_time = datetime.datetime.now()        
 
