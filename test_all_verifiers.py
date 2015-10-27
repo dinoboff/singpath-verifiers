@@ -133,12 +133,12 @@ workers = {}
 
 # We can pace how many threads are started and active at any given time.  
 print("Running with parallelism {}".format(parallelism)) 
-
+problems_tested = 0.0
 for language in examples.keys():
   if not "language" in test_results.keys():
       test_results[language] = []  
   for key in examples[language].keys():
-      
+      problems_tested += 1
       # This needs to be run in parallel. 
       async_result = pool.apply_async(setup_and_verify, (language, key))
       workers[(language,key)] = async_result
@@ -174,5 +174,6 @@ for language in test_results.keys():
     for result in test_results[language]: 
         print(result)
 print()
-print("Running all tests took {}.".format(stop_time - start_time))
+duration = stop_time - start_time
+print("Running all tests took {} seconds for an average of {:.2f} seconds per problem.".format(duration.seconds ,duration.seconds/problems_tested ))
 
