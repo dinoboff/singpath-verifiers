@@ -86,8 +86,7 @@ if compile_result == "":
     junit_result = junit_test()
 else: 
     # write out a standard compile error result. 
-    data = {"solved":False, 
-            "results": [["Compile error", 0, compile_result, "fail"]]}
+    data = {"errors": compile_result}
     with open("results.json", 'w') as outfile:
         json.dump(data, outfile) 
 

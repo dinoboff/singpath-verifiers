@@ -3,18 +3,21 @@
     "pass_example": {
       "tests": ">>> x\n 2\n>>> y\n 3",
       "solution": "x=2\ny=3",
-      "is_solved": true
+      "is_solved": true, 
+      "result":{"results": [{"call": "x", "correct": true, "expected": 2, "received": 2}, {"call": "y", "correct": true, "expected": 3, "received": 3}], "solved": true, "printed": ""}
     },
     "fail_example": {
       "tests": ">>> x\n 2\n>>> y\n 3",
       "solution": "x=2\ny=2",
-      "is_solved": false
+      "is_solved": false,
+      "result":{"results": [{"correct": true, "call": "x", "expected": 2, "received": 2}, {"correct": false, "call": "y", "expected": 3, "received": 2}], "solved": false, "printed": ""}
     },
     "error_example": {
       "tests": ">>> x\n 2",
       "solution": "y=2",
       "is_solved": false,
-      "returns_error": true
+      "returns_error": true,
+      "result":{"errors":"Example error."}
     },    
     "print_example": {
       "tests": ">>> x\n 2",
@@ -45,12 +48,15 @@
     "stream": {
       "tests": "SingPath sp = new SingPath();\nassertEquals(3 , sp.add());",
       "solution": "import java.util.*;\nimport java.util.stream.*;\n\npublic class SingPath {\n   public long add() {long count = Arrays.asList(1,2,3).stream().count();\n  return count;\n   }\n} \n",
-      "is_solved": true
+      "is_solved": true,
+      "result":{"results": [], "solved": true, "printed": ""}
+      
     },
     "stream_fail": {
       "tests": "SingPath sp = new SingPath();\nassertEquals(3 , sp.add());",
       "solution": "import java.util.*;\nimport java.util.stream.*;\n\npublic class SingPath {\n   public long add() {long count = Arrays.asList(1).stream().count();\n  return count;\n   }\n} \n",
-      "is_solved": false
+      "is_solved": false, 
+      "result":{"results": [{"expected": "<3> ", "call": "testExample(SingPathTest)", "correct": false, "received": "<1>"}], "solved": false, "printed": ""}
     },
     "3": {
       "tests": "assertEquals(2 , 2);\n",
@@ -100,7 +106,8 @@
     "compile_error": {
       "tests": "assertEquals(2 , 2);",
       "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0\n   }\n} \n",
-      "is_solved": false
+      "is_solved": false,
+      "result":{"errors":"Example error."}
     }
   }
 }

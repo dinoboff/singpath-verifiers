@@ -55,7 +55,7 @@ def run_secure_verifier(directory, language):
 
         # Will call Docker using subprocess and capture the output. 
         # Todo: handle errors and support timeouts. 
-        print("Running command -> {}".format(docker_command))
+        print("Running command {} -> {}".format(directory, docker_command))
         import subprocess
         
         # This will need to be returned to run in parallel. 
@@ -75,7 +75,7 @@ def run_secure_verifier(directory, language):
             except:
                 data = {"errors": "An error occurred when calling the verifier. {}".format(str("TBD"))}   
                     
-        print("The result returned from the verifier was {}".format(data))
+        print("The result {}".format(data))
         return data
  
 # Load problem examples
@@ -111,6 +111,23 @@ def setup_and_verify(language, key):
             test_results[language].append("**Failed** - {} expected {} recieved {}.".format(key,example['is_solved'],result['solved']))
         else:
             test_results[language].append("Passed {} -> {}".format(language, key))
+            # Now check to see if the results match. 
+            if "result" in example:
+              if "results" in example["result"] and "results" in result:
+                # Check for matching results lengths. 
+                if len(example["result"]["results"]) != len(result["results"]): #len(result['results']) != len(example['result']['results']):
+                    
+                    print("\n---Results do not match in length --------")
+                    print("Recieved {}".format(result['results']))
+                    print("Expected {}".format(example['result']['results']))
+                    print("------------------------------------------\n")
+              elif "errors" in example['result']:
+       
+                  print("******** Errors in example **************************")
+                  print("Recieved {}".format(result))
+                  print("Expected {}".format(example['result'])) 
+                  print("*****************************************************")                
+           
     elif "errors" in result:
         if "returns_error" in example:
             test_results[language].append("Passed {} -> {}".format(language, key))
