@@ -17,7 +17,7 @@
       "solution": "y=2",
       "is_solved": false,
       "returns_error": true,
-      "result":{"errors":"Example error."}
+      "result":{"errors":"Python missing value test error."}
     },    
     "print_example": {
       "tests": ">>> x\n 2",
@@ -35,13 +35,15 @@
     "fail_example": {
       "tests": "",
       "solution": "fail",
-      "is_solved": false
+      "is_solved": false,
+      "result":{"results": [], "solved": true, "printed": ""}
     },
     "error_example": {
       "tests": "",
       "solution": "error",
       "is_solved": false,
-      "returns_error": true
+      "returns_error": true,
+      "result":{"errors":"Example error"}
     }
   },
   "java": {
@@ -101,13 +103,15 @@
     "fail_example": {
       "tests": "assertEquals(2 , 3);",
       "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0;\n   }\n} \n",
-      "is_solved": false
+      "is_solved": false,
+      "result":{"call": "testExample(SingPathTest)", "received": "<3>", "expected": "<2> ", "correct": false}
     },
     "compile_error": {
       "tests": "assertEquals(2 , 2);",
       "solution": "\npublic class SingPath {\n   public Double add() {\n      return 2.0\n   }\n} \n",
       "is_solved": false,
-      "result":{"errors":"Example error."}
+      "returns_error": true,
+      "result":{"errors":"Test error for compile."}
     }
   }
 }

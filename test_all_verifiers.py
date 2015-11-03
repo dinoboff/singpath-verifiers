@@ -121,14 +121,14 @@ def setup_and_verify(language, key):
                     print("Recieved {}".format(result['results']))
                     print("Expected {}".format(example['result']['results']))
                     print("------------------------------------------\n")
-              elif "errors" in example['result']:
-       
-                  print("******** Errors in example **************************")
-                  print("Recieved {}".format(result))
-                  print("Expected {}".format(example['result'])) 
-                  print("*****************************************************")                
-           
+
     elif "errors" in result:
+               
+        #print("******** Errors in example **************************")
+        #print("Recieved {}".format(result))
+        #print("Expected {}".format(example['result'])) 
+        #print("*****************************************************")                
+           
         if "returns_error" in example:
             test_results[language].append("Passed {} -> {}".format(language, key))
         else:
