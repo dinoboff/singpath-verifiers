@@ -1,0 +1,40 @@
+---
+language: java
+tests: "assertEquals(2 , 2);"
+solution: |
+  public class SingPath {
+    public Double add() {
+      return 2.0;
+    }
+  }
+expected: true
+---
+language: java
+tests: "assertEquals(2 , 2);"
+solution: |
+  public class SingPath {
+    public Double add() {
+      return 2.0;
+    }
+  }
+expected: true
+---
+language: java
+tests: "assertEquals(2 , 2);"
+solution: |
+  public class SingPath {
+     public Double add() {
+        return 2.0;
+     }
+   }
+expected: true
+---
+language: java
+tests: "assertEquals(2 , 2);"
+solution: |
+  public class SingPath {
+    public Double add() {
+      return 2.0;
+    }
+  }
+expected: true

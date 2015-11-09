@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+
+console.error(process.argv.slice().pop());
+console.log(JSON.stringify({
+	solved: false,
+	errors: "Not implmented"
+}));
