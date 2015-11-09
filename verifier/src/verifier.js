@@ -3,11 +3,10 @@
 const Docker = require('dockerode');
 const fs = require('./promiseFs');
 const Writable = require('stream').Writable;
-const verifierImages = require('./images.json');
+const verifierImages = require('../images.json');
 
 const DELAY = 6000;
 const SOCKET_PATH = '/var/run/docker.sock';
-const VERIFIERS_TAG = 'latest';
 
 
 /**
@@ -210,72 +209,6 @@ exports.run = function run(client, payload, logger) {
 
     return Promise.reject(err);
   });
-};
-
-const images = exports.images = {
-  /**
-   * Pull an image from docker hub.
-   *
-   * @param  {Docker} client dockerode's Docker instance.
-   * @param  {string} image  image name
-   * @return {Promise}       Resolve to the pull stream.
-   */
-  pull: function pullImage(client, image) {
-    return new Promise((ok, fails) => {
-      client.pull(image, (err, stream) => {
-        if (err) {
-          fails(err);
-        } else {
-          ok(stream);
-        }
-      });
-    });
-  },
-
-  /**
-   * Load list of verifier images availables.
-   *
-   * @param  {Docker} client dockerode's Docker instance.
-   * @return {Promise}       Promise resolving to an image name list
-   *                         (the image name with its tag)
-   */
-  list: function verifierImages(client) {
-    return new Promise((ok, fails) => {
-      client.listImages({
-      }, (err, data) => {
-        if (err) {
-          fails(err);
-        } else {
-          ok(
-            data.filter(
-              i => i.Labels && i.Labels['com.singpath.verifier']
-            ).map(
-              i => i.RepoTags.filter(t => t.startsWith('singpath/verifier2') && t.endsWith(`:${VERIFIERS_TAG}`))
-            ).filter(
-              tags => tags.length > 0
-            ).map(
-              tags => tags[0]
-            )
-          );
-        }
-      });
-    });
-  },
-
-  /**
-   * Load list of missing images
-   */
-  listMissing: function missingVerifierImages(client) {
-    images.verifierImages(client).then(images => {
-      const found = new Set(images);
-
-      return Object.keys(verifierImages).map(
-        name => `${images[name]}:${VERIFIERS_TAG}`
-      ).filter(
-        image => !found.has(image)
-      );
-    });
-  }
 };
 
 function containerOptions(payload) {

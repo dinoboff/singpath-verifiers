@@ -39,7 +39,7 @@ USER verifier
 COPY ./src /app/src
 COPY ./tests /app/tests
 COPY ./bin /app/bin
-COPY .eslintrc solution-example.yaml README.md CONTRIBUTING.md /app/
+COPY images.json .eslintrc solution-example.yaml README.md CONTRIBUTING.md /app/
 
 LABEL com.singpath.verifier="master"
 

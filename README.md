@@ -37,8 +37,7 @@ cd singpath-verifiers
 make
 ```
 
-A verifier container should be named "singpath/verifier2-<language-name>" and
-tagged "latest". It should have command name "verify" in the path taking
+A verifier container should have command name "verify" in the path taking
 a json encoded "solution" and "tests" payload as argument and return to `stdout`
 the json encode result object. It must have a boolean "solved" field; typically
 something like this:
