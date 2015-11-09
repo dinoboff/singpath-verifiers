@@ -3,32 +3,46 @@
 The docker-based verifiers that support SingPath.com
 
 You can launch an Amazon Linux image on EC2 to quickly test all the current
-verifiers. The following steps need to be run after you launch a starndare
+verifiers. The following steps need to be run after you launch a standard
 Amazon micro-instance image.
 
 ```shell
+# install docker
 sudo yum install docker
 sudo service docker start
+
+# Get the ID of the group having write access on the docker socket
+export DOCKER_GROUP_NAME=`ls -l /var/run/docker.sock | awk '{ print $4 }'`
+export DOCKER_GROUP_ID=`cat /etc/group | grep "^$DOCKER_GROUP_NAME" | cut -d: -f3`
+
+# Start the verifier, passing the socket and giving it read/write permission
 docker run -ti --rm \
 	-v /var/run/docker.sock:/var/run/docker.sock \
-	--group-add 100 \
-	-e SINGPATH_FIREBASE_SECRET="firebase-secret" \
+	--group-add $DOCKER_GROUP_ID \
+	-e SINGPATH_FIREBASE_SECRET="your-firebase-secret" \
 	-e SINGPATH_FIREBASE_QUEUE="https://singpath.firebaseio.com/singpath/queues/my-queue" \
 	singpath/verifier2
 ```
 
-
 The verifier will create a Firebase auth token using a Firebase secret if you
-are administrator of the Firbase db. If you don't, the verifier will query a
-auth token from an authentication server using a SingPath token (TODO, the
-token will be available from SingPath.com for authorized users).
+are administrator of the Firbase db. If you are not administrator, the verifier
+will instead query a auth token from an authentication server using a SingPath
+token (Not implemented yet, the token will be available from SingPath.com for
+authorized users).
 
-The verifier will watch for new task of Firebase queue, attempt to claim them
-(you can have a cluster competing for the tasks), run the tests in a one use
-container and save the result.
+The verifier will watch for new task in the Firebase queue, attempt to claim
+them (you can have a cluster competing for the tasks), run the tests in a one
+use container and save the result).
+
+	Note:
+
+	The `--group-add $DOCKER_GROUP_ID` need to be adjusted to the host. It
+	should the GID off the docker socket host.
+
+	The GID is `100` for the OS X / Windows docker virtual machine.
 
 
-## Developing verifier.
+## Development
 
 To build the verifier images locally:
 ```shell
@@ -49,8 +63,6 @@ something like this:
 'solved': False,}
 ```
 
-It may log debug info to `stderr`.
-
 These results from verifying code are usually used to build a table to provide
 feedback to users:
 
@@ -61,8 +73,12 @@ feedback to users:
 | y      | 3        | 2         | False   |
 ```
 
-A dummy verifier would add a  `Dockerfile` and a `verify` files to a
-`dummy` directory:
+It can also log debug info to `stderr`. The `stderr` stream will be piped to
+the verifier daemon `stderr`.
+
+A new verifier, that we name `dummy` would have a `Dockerfile` and a `verify`
+files in a `dummy` directory:
+
 ```Dockefile
 FROM python:3.4-slim
 
@@ -102,7 +118,7 @@ docker run -ti --rm singpath/verifier2-dummy:latest verify '{
 }'
 ```
 
-You should also need to add the image to `verifier/src/images.json`:
+You would also need to add the image to `verifier/images.json`:
 ```json
 {
     "java": "singpath/verifier2-java",
@@ -112,5 +128,26 @@ You should also need to add the image to `verifier/src/images.json`:
 }
 ```
 
-The verifier daemon and verify images are built automatically via the master
+And add a line to `Makefile` (Makefile must use TAB for indentation):
+```Makefile
+default: build
+
+build:
+	docker build -t singpath/verifier2:latest ./verifier
+	docker build -t singpath/verifier2-java:latest ./java
+	docker build -t singpath/verifier2-python:latest ./python
+	docker build -t singpath/verifier2-javascript:latest ./javascript
+	docker build -t singpath/verifier2-dummy:latest ./dummy
+.PHONY: build
+```
+
+The verifier daemon and verify images are built automatically when the master
 branch gets new commits using docker hub automatic build.
+
+## TODO
+
+- setup Travis [circleci.com](https://circleci.com/docs/docker) test.
+- clean up after failing or exiting verifier worker.
+- implement python and javascript (simply switch the current verifiers server
+  api for a cli).
+- Update document to setup
