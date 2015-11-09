@@ -3,7 +3,7 @@
 const Docker = require('dockerode');
 const fs = require('./promiseFs');
 const Writable = require('stream').Writable;
-const images = require('./images.json');
+const verifierImages = require('./images.json');
 
 const DELAY = 6000;
 const SOCKET_PATH = '/var/run/docker.sock';
@@ -177,7 +177,7 @@ exports.run = function run(client, payload, logger) {
   if (
     !payload ||
     !payload.language ||
-    !images[payload.language]
+    !verifierImages[payload.language]
   ) {
     return Promise.reject(new Error('Unsupported language.'));
   }
@@ -269,7 +269,7 @@ const images = exports.images = {
     images.verifierImages(client).then(images => {
       const found = new Set(images);
 
-      return Object.keys(images).map(
+      return Object.keys(verifierImages).map(
         name => `${images[name]}:${VERIFIERS_TAG}`
       ).filter(
         image => !found.has(image)
@@ -288,7 +288,7 @@ function containerOptions(payload) {
       'solution': payload.solution,
       'tests': payload.tests
     })],
-    'Image': images[payload.language],
+    'Image': verifierImages[payload.language],
     'HostConfig': {
       'CapDrop': ['All'],
       'NetworkMode': 'none'
