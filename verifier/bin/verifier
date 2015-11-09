@@ -25,8 +25,6 @@ Environment:
 `;
 
 function main() {
-  let q, generator, authToken;
-
   if (!FBENDPOINT) {
     console.error('Firebase queue path is missing. Please set the SINGPATH_FIREBASE_QUEUE environment variable.');
     console.error(USAGE);
@@ -46,25 +44,44 @@ function main() {
   }
 
 
-  verifier.dockerClient().then(client => {
-    q = queue.queue(FBENDPOINT, client);
+  verifier.dockerClient().then(
+    client => queue.queue(FBENDPOINT, client)
+  ).then(q => {
     logEvents(q);
-  }).then(() => {
-    console.log('Generating auth token...');
-    generator = queue.tokenGenerator(FBSECRET);
-    authToken = generator.worker(q.queueName);
+    q.on('watchStopped', err => {
+      if (err == null) {
+        q.cleanup().then(
+          () => process.exit(131),
+          () => process.exit(131)
+        );
+      }
 
-    console.log('Authenticating client...');
-    return q.auth(authToken);
-  }).then(() => {
-    return q.watch();
-  }).catch(err => {
+      watch(q);
+    });
+    return watch(q);
+  });
+}
+
+function watch(q) {
+  console.log('Generating auth token...');
+
+  const generator = queue.tokenGenerator(FBSECRET);
+  const authToken = generator.worker(q.queueName);
+
+  console.log('Authenticating client...');
+  return q.auth(authToken).then(
+    () => q.cleanUp()
+  ).then(
+    () => q.watch()
+  ).catch(err => {
     console.error(err);
     process.exit(130);
   });
 }
 
 function logEvents(q) {
+  // TODO: set up logger and replace most of the event - only "watchStopped" is
+  // useful.
   q.on('loggedIn', authData => console.error(`logged with ${JSON.stringify(authData)}.`));
   q.on('loggedOut', authData => console.error(`logged out (${authData}).`));
   q.on('workerRegistered', () => console.error('worker registered.'));
@@ -73,13 +90,12 @@ function logEvents(q) {
   q.on('workerPresenceUpdateFailed', err => console.error(`worker update failed ${err.toString()}.`));
   q.on('workerPresenceUpdateStopped', () => console.error('worker updates stopped.'));
   q.on('watchStarted', () => console.error('watch started.'));
-  q.on('watchStopped', err => {
-    console.error(`Watch stopped: ${err.toString()}.`);
-    process.exit(131);
-  });
+  q.on('watchStopped', err => console.error(`Watch stopped: ${err.toString()}.`));
   q.on('taskRunScheduled', (key, task) => console.error(`Task schedule (${key}): ${JSON.stringify(task)}.`));
   q.on('taskClaimed', key => console.error(`Task ${key} claimed.`));
   q.on('taskRun', (key, results) => console.error(`Task ${key} run: ${JSON.stringify(results)}.`));
+  q.on('taskResultSave', (key) => console.error(`Task ${key} saved.`));
+  q.on('taskResultSavingFailed', (key) => console.error(`Failed to save task ${key}.`));
   q.on('taskRunFailed', (key, err) => console.error(`Failed to run ${key}: ${err.toString()}.`));
   q.on('taskClaimRemoved', key => console.error(`Task claim on ${key} removed.`));
   q.on('taskClaimRemovalFailed', key => console.error(`Task claim on ${key} failed to be removed .`));

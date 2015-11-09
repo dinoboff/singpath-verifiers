@@ -67,7 +67,18 @@ exports.FIFO = class FIFO {
     this.offset = 0;
   }
 
-  toArray() {
-    return this.queue.slice(this.offset);
+  /**
+   * Reset the queue
+   *
+   * @param  {Function} fn Function to map over elements in the queue
+   * @return {Array}       The result of the map operation or an empty array.
+   */
+  reset(fn) {
+    try {
+      return fn ? this.queue.slice(this.offset).map(fn) : [];
+    } finally {
+      this.queue = [];
+      this.offset = 0;
+    }
   }
 };

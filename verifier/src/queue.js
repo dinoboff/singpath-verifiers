@@ -343,6 +343,22 @@ class Queue extends events.EventEmitter {
     });
   }
 
+  /**
+   * Remove any claim on the task in the queue and reset it.
+   *
+   * TODO: remove old client and old claim.
+   * 
+   * @return {Promise}.
+   */
+  cleanUp() {
+    if (!this.isWorker) {
+      return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
+    }
+
+    this.tasksToRun.reset();
+    return Promise.resolve();
+  }
+
 }
 
 /**
