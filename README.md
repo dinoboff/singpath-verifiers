@@ -37,7 +37,7 @@ use container and save the result).
 	Note:
 
 	The `--group-add $DOCKER_GROUP_ID` need to be adjusted to the host. It
-	should the GID off the docker socket host.
+	should be the GID of the host docker socket.
 
 	The GID is `100` for the OS X / Windows docker virtual machine.
 
@@ -57,10 +57,10 @@ the json encode result object. It must have a boolean "solved" field; typically
 something like this:
 
 ```json
-{'results': [{'call': 'x', 'expected': 2, 'received': '2', 'correct': True},
-             {'call': 'y', 'expected': 3, 'received': '2', 'correct': False}],
-'printed': '',
-'solved': False,}
+{"results": [{"call": "x", "expected": 2, "received": "2", "correct": True},
+             {"call": "y", "expected": 3, "received": "2", "correct": False}],
+"printed": ",
+"solved": False,}
 ```
 
 These results from verifying code are usually used to build a table to provide
@@ -76,8 +76,8 @@ feedback to users:
 It can also log debug info to `stderr`. The `stderr` stream will be piped to
 the verifier daemon `stderr`.
 
-A new verifier, that we name `dummy` would have a `Dockerfile` and a `verify`
-files in a `dummy` directory:
+A new verifier, that we would name `dummy`, would have a `Dockerfile` and
+a `verify` files in a `dummy` directory:
 
 ```Dockefile
 FROM python:3.4-slim
@@ -146,7 +146,7 @@ branch gets new commits using docker hub automatic build.
 
 ## TODO
 
-- setup Travis [circleci.com](https://circleci.com/docs/docker) test.
+- setup [circleci.com](https://circleci.com/docs/docker) continuous tests.
 - clean up after failing or exiting verifier worker.
 - implement python and javascript (simply switch the current verifiers server
   api for a cli).
