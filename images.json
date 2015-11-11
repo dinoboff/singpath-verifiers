@@ -1,0 +1,14 @@
+{
+    "java": {
+        "name": "singpath/verifier2-java",
+        "path": "./java"
+    },
+    "javascript": {
+        "name": "singpath/verifier2-javascript",
+        "path": "./javascript"
+    },
+    "python": {
+        "name": "singpath/verifier2-python",
+        "path": "./python"
+    }
+}

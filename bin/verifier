@@ -1,0 +1,324 @@
+#!/usr/bin/env python2.7
+from __future__ import print_function
+
+import argparse
+import getpass
+import json
+import logging
+import os
+import subprocess
+import sys
+
+
+DOCKER_GID = 'dockerGroupId'
+FB_ID_KEY = 'firebaseID'
+FB_QUEUE_KEY = 'firebaseQueueName'
+FB_SECRET = 'firebaseSecret'
+DEFAULT_SETTINGS = {
+    FB_ID_KEY: 'singpath-play',
+    FB_QUEUE_KEY: 'default',
+    FB_SECRET: None,
+    DOCKER_GID: None,
+}
+
+SOCKET_PATH = '/var/run/docker.sock'
+SSH_CMD = ("""
+export DOCKER_GROUP_NAME=`ls -l %s | awk '{ print $4 }'`;
+cat /etc/group | grep "^$DOCKER_GROUP_NAME" | cut -d: -f3
+""" % SOCKET_PATH).replace('\n', ' ').strip()
+
+
+def main():
+    args = parse_args()
+    logging.basicConfig(
+        format='%(asctime)s - %(message)s', level=args.level
+    )
+    args.func(args)
+
+
+def init(opts):
+    settings = load_setting()
+    machine_id, machine_settings = ask_settings(settings)
+    machine_id, machine_settings = set_socket_id(machine_id, machine_settings)
+    save_settings(settings, machine_id, machine_settings)
+
+    logging.info(
+        'Setting for machine "%s" saved into "./.verifier.json"'
+        % machine_id
+    )
+
+
+def start(opts):
+    if opts.skip_build:
+        logging.info('Skipping building required docker images.')
+    else:
+        logging.info('Building required docker images...')
+        build_all()
+
+    settings = get_settings(opts.machine)
+    if settings[DOCKER_GID] is None:
+        logging.error('Docker socket group id is missing.')
+        exit(128)
+
+    if settings[FB_SECRET] is None:
+        logging.error('Firebase secret is missing.')
+        exit(129)
+
+    queue_url = "https://%s.firebaseio.com/singpath/queues/%s" % (
+        settings[FB_ID_KEY],
+        settings[FB_QUEUE_KEY],
+    )
+    container_name = 'machine-%s' % opts.machine
+
+    cmd = [
+        'docker', 'run', '--rm', '--name', container_name,
+        '-v', '/var/run/docker.sock:/var/run/docker.sock',
+        '--group-add', str(settings[DOCKER_GID]),
+        '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
+        '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
+        'singpath/verifier2', '/app/bin/verifier'
+    ]
+
+    try:
+        logging.info('Starting container as %s...', container_name)
+        docker = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            stdin=subprocess.PIPE,
+        )
+        return docker.wait()
+    except KeyboardInterrupt as e:
+        logging.info('Stopping container %s...', container_name)
+        docker.terminate()
+        subprocess.Popen(['docker', 'kill', container_name]).wait()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            'Manage the verifier daemon. '
+            'Assumes the docker server will run locally '
+            'or that docker-machine will manage your remote docker machine '
+            '(like a OS X / Windows virtualbox VM or a production server on '
+            'AWS, GCE, Digital Ocean, etc...).'
+        )
+    )
+    parser.add_argument(
+        '-q', '--quiet',
+        action='store_const', dest='level', const=logging.WARNING
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        action='store_const', dest='level', const=logging.DEBUG
+    )
+    parser.set_defaults(level=logging.INFO)
+
+    subparsers = parser.add_subparsers()
+
+    init_parser = subparsers.add_parser(
+        'init',
+        help='configure verifier',
+        description=(
+            'Build machine settings to save in .verifier.json. '
+            'Each docker host (machine) you will run the verifier will have '
+            'its own settings.'
+        ),
+    )
+    init_parser.set_defaults(func=init)
+
+    start_parser = subparsers.add_parser(
+        'start',
+        help='start verifier',
+        description=(
+            'Start the verifier - '
+            'docker should already be set to use the correct machine '
+            '(see `docker-machine env` on OS X / Windows).'
+        ),
+    )
+    start_parser.add_argument(
+        '-s', '--skip-build',
+        action='store_true',
+        help='use already built/pulled containers'
+    )
+    start_parser.add_argument(
+        'machine',
+        help='machine to start (default: %(default)s)',
+        nargs='?',
+        default='default'
+    )
+    start_parser.set_defaults(func=start)
+
+    return parser.parse_args()
+
+
+def build(image, path):
+    logging.info('Building "%s" from "%s"', image, path)
+    docker = subprocess.Popen(
+        ['docker', 'build', '-t', image, path],
+        stdout=sys.stdout,
+        stderr=sys.stderr
+    )
+    return docker.wait()
+
+
+def build_all():
+    build('singpath/verifier2:latest', './verifier')
+    for name, path in load_images():
+        build('%s:latest' % name, path)
+
+
+def load_images():
+    root = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        '..',
+    )
+
+    def join(p):
+        return os.path.join(root, p)
+
+    with open(join('./images.json')) as fd:
+        images = json.load(fd)
+        for image in images.itervalues():
+            yield image['name'], join(image['path'])
+
+
+def prompt(msg, default):
+    result = raw_input('%s [%s]: ' % (msg, default,))
+    result = result if result else default
+    logging.info('%s : %s', msg.strip(), result)
+    return result
+
+
+def load_setting():
+    try:
+        logging.info('Loading existing settings...')
+        with open('./.verifier.json') as fp:
+            return json.load(fp)
+    except Exception:
+        logging.debug('verifier.json was not found.')
+        return {}
+
+
+def get_settings(machine_id, settings=None):
+    settings = settings if settings is not None else load_setting()
+    machine_settings = {}
+    machine_settings.update(DEFAULT_SETTINGS)
+    machine_settings.update(settings.get(machine_id, {}))
+    return machine_settings
+
+
+def save_settings(settings, machine_id, machine_settings):
+    settings[machine_id] = machine_settings
+    logging.info('Saving settings...')
+    with open('./.verifier.json', 'w') as fp:
+            output = json.dumps(
+                settings,
+                sort_keys=True,
+                indent=4,
+                separators=(',', ': ')
+            )
+            fp.write(output)
+            return output
+
+
+def ask_settings(settings):
+    machine_id = prompt('Machine ID', 'default')
+    machine_settings = get_settings(machine_id, settings=settings)
+
+    machine_settings[FB_ID_KEY] = prompt(
+        '\n\nFirebase ID',
+        machine_settings[FB_ID_KEY]
+    )
+
+    machine_settings[FB_QUEUE_KEY] = prompt(
+        '\n\nFirebase queue name',
+        machine_settings[FB_QUEUE_KEY]
+    )
+
+    error(
+        '\n\nYour firebase secret is available at '
+        'https://%s.firebaseio.com/?page=Admin' % machine_settings[FB_ID_KEY]
+    )
+    firebase_secret = getpass.getpass(
+        prompt='\nFirebase secret: ', stream=sys.stderr
+    )
+    machine_settings[FB_SECRET] = (
+        firebase_secret if firebase_secret else machine_settings[FB_SECRET]
+    )
+
+    return machine_id, machine_settings
+
+
+def set_socket_id(machine_id, settings):
+    logging.info('Guessing machine\'s docker socket group id...')
+    gid = local_socket_gid()
+    if gid is None:
+        gid = remote_socket_gid(machine_id)
+
+    if gid is None:
+        logging.warning(
+            'Failed to guess the docker socket group id.\n'
+            'Find out which group id the verifier needs to gain access '
+            'to the docker socket and assign it to "%s" in ./.verifier.json'
+            % DOCKER_GID
+        )
+    else:
+        settings[DOCKER_GID] = gid
+        logging.info('Docker group id is %s', gid)
+    return machine_id, settings
+
+
+def remote_socket_gid(machine_id):
+    docker_machine = which('docker-machine')
+    if docker_machine is None:
+        logging.debug('No docker-machine.')
+        return
+
+    ssh = subprocess.Popen(
+        [docker_machine, 'ssh', machine_id, SSH_CMD],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = (s.strip() for s in ssh.communicate())
+    if ssh.returncode != 0:
+        logging.debug(
+            'Failed to find remote docker socket group id: %s', stderr
+        )
+        return
+
+    return int(stdout)
+
+
+def local_socket_gid():
+    try:
+        return os.stat(SOCKET_PATH).st_gid
+    except Exception:
+        logging.debug('No local docker socket.')
+        return None
+
+
+def is_exe(fpath):
+    return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+
+def which(program):
+    """
+    Python implementation of which
+
+    see http://stackoverflow.com/questions/377017
+    """
+    for path in os.environ["PATH"].split(os.pathsep):
+        path = path.strip('"')
+        exe_file = os.path.join(path, program)
+        if is_exe(exe_file):
+            return exe_file
+    return None
+
+
+def error(*args):
+    print(*args, **{'file': sys.stderr})
+
+
+if __name__ == '__main__':
+    main()
