@@ -10,12 +10,16 @@ The docker-based verifiers that support SingPath.com
 - git;
 - docker;
 - docker-machine;
+- a Firebase DB and its secret.
 - Either VirtualBox or an account on a provider
 [docker-machine support](https://docs.docker.com/machine/drivers/os-base/)
 (e.g.: Digital Ocean, Amazon Web Services or Google Compute Engine)
 
 On OS X and Windows, you should install
-[Docker Tools](https://www.docker.com/docker-toolbox).
+[Docker Tools](https://www.docker.com/docker-toolbox); it will include
+docker, docker-machine and VirtualBox.
+
+On Windows, install git usually include a bash terminal.
 
 
 ## Setup
@@ -23,21 +27,24 @@ On OS X and Windows, you should install
 We will setup a machine named "default" on a virtualbox VM and configure
 verifier to run on it.
 
-1. create the docker host : `docker-machine create -d virtualbox default`
-2. checkout the verifier repository: `git clone https://github.com/ChrisBoesch/singpath-verifiers.git`
-3. configure docker: `eval "$(docker-machine env default)"`
-4. configure the verifier for this machine: `cd singpath-verifiers; ./bin/verifier init`
+1. create the docker host : `docker-machine create -d virtualbox default`;
+2. checkout the verifier repository: `git clone https://github.com/ChrisBoesch/singpath-verifiers.git`;
+3. configure docker: `eval "$(docker-machine env default)"`;
+4. configure the verifier for this machine: `cd singpath-verifiers; ./bin/verifier init`;
+5. upload the rules (WIP: The rules are not yet public).
+
+TODO: publish rules or partial rules related to rules.
 
 
 ## Running the verifier
 
-1. start the machine: `docker-machine start default`
-2. configure docker: `eval "$(docker-machine env default)"`
-3. start the verifier: `cd singpath-verifiers; ./bin/verifier start default`
+0. start the machine if it's not already running: `docker-machine start default`
+1. configure docker: `eval "$(docker-machine env default)"`
+2. start the verifier: `cd singpath-verifiers; ./bin/verifier start default`
    The first time it will need download the base images and build the verifier
    images without a cache; it will take a few minutes.
- 4. press "ctrl+c" to stop the verifier.
- 5. Either stop the machine (`docker-machine stop default`) or restart the
+3. press "ctrl+c" to stop the verifier.
+4. Either stop the machine (`docker-machine stop default`) or restart the
     verifier [3].
 
 The verifier will create a Firebase auth token using a Firebase secret if you
