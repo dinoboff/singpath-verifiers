@@ -3,7 +3,7 @@
 const Docker = require('dockerode');
 const fs = require('./promiseFs');
 const Writable = require('stream').Writable;
-const verifierImages = require('../../images.json');
+const verifierImages = require('../images.json');
 
 const DELAY = 6000;
 const SOCKET_PATH = '/var/run/docker.sock';

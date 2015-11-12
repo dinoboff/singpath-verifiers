@@ -89,7 +89,7 @@ the verifier daemon `stderr`.
 ### Example
 
 A new verifier, that we would name `dummy`, would have a `Dockerfile` and
-a `verify` files in a `dummy` directory:
+a `verify` files in a `verifier/verifiers/dummy` directory:
 
 ```Dockefile
 FROM python:3.4-slim
@@ -122,14 +122,27 @@ cd ./dummy
 docker build -t singpath/verifier2-dummy:latest .
 ```
 
-You would also need to add the image to `images.json`:
+You would also need to add the image to `verifier/images.json`:
 ```json
 {
-    "java": "singpath/verifier2-java",
-    "javascript": "singpath/verifier2-javascript",
-    "python": "singpath/verifier2-python",
-    "dummy": "singpath/verifier2-dummy"
+    "java": {
+        "name": "singpath/verifier2-java",
+        "path": "./verifier/verifiers/java"
+    },
+    "javascript": {
+        "name": "singpath/verifier2-javascript",
+        "path": "./verifier/verifiers/javascript"
+    },
+    "python": {
+        "name": "singpath/verifier2-python",
+        "path": "./verifier/verifiers/python"
+    },
+    "dummy": {
+        "name": "singpath/verifier2-dummy",
+        "path": "./verifier/verifiers/dummy"
+    }
 }
+
 ```
 
 To try it with:
@@ -219,3 +232,4 @@ To push a file content, you could use:
 - clean up after failing or exiting verifier worker.
 - implement python and javascript verifier (simply switch the current verifiers server
   api for a cli).
+- Build language verifier from daemon container.

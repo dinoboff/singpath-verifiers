@@ -76,6 +76,7 @@ def start(opts):
         '--group-add', str(settings[DOCKER_GID]),
         '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
         '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
+        '-e', 'SINGPATH_SKIP_BUILD=skip',
         'singpath/verifier2', '/app/bin/verifier'
     ]
 
@@ -145,7 +146,7 @@ def test(opts):
     print(image_name, image_path)
 
     if image_name is None or image_path is None:
-        logging.error('Docker image for %s is not defined in images.json')
+        logging.error('Docker image for %s is not defined in verifier/images.json')
         exit(128)
 
     if opts.skip_build:
@@ -292,7 +293,9 @@ def build(image, path):
         stdout=sys.stdout,
         stderr=sys.stderr
     )
-    return docker.wait()
+    code = docker.wait()
+    if code != 0:
+        exit(code)
 
 def build_verifier():
     build('singpath/verifier2:latest', './verifier')
@@ -307,13 +310,13 @@ def build_all(opts=None):
 def load_images():
     root = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        '..',
+        '../verifier',
     )
 
     def join(p):
         return os.path.join(root, p)
 
-    with open(join('./images.json')) as fd:
+    with open(join('images.json')) as fd:
         images = json.load(fd)
         for name, image in images.iteritems():
             yield name, (image['name'], join(image['path']))

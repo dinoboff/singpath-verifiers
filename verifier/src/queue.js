@@ -12,7 +12,7 @@ const DEFAULT_MAX_WORKER = 10;
 
 
 class Queue extends events.EventEmitter {
-  
+
   constructor(endpoint, dockerClient, options) {
     super();
 
@@ -30,7 +30,7 @@ class Queue extends events.EventEmitter {
 
     this.ref.onAuth(authData => {
       this.authData = authData;
-      
+
       if (authData && authData) {
         this.emit('loggedIn', authData);
       } else {
@@ -52,7 +52,7 @@ class Queue extends events.EventEmitter {
   get isWorker() {
     return (
       this.isLoggedIn &&
-      this.authData.auth && 
+      this.authData.auth &&
       this.authData.auth.isWorker &&
       this.authData.auth.queue === this.queueName
     );
@@ -104,10 +104,10 @@ class Queue extends events.EventEmitter {
   }
 
   /**
-   * Register a worker for a queue and start a timer to update the worker 
+   * Register a worker for a queue and start a timer to update the worker
    * presence.
-   * 
-   * @return {Promise} Resolve when the worker is registered, to a function to 
+   *
+   * @return {Promise} Resolve when the worker is registered, to a function to
    *                   deregister it.
    */
   registerWorker() {
@@ -122,7 +122,7 @@ class Queue extends events.EventEmitter {
       this.emit('workerRegistered', ref);
 
       let timer, stopTimer;
-      
+
       timer = setInterval(() => {
         this.updatePresence().catch(stopTimer);
       }, this.opts.presenceDelay);
@@ -134,10 +134,10 @@ class Queue extends events.EventEmitter {
           this.emit('workerPresenceUpdateStopped');
         }
       };
-      
+
       return () => {
         stopTimer();
-        
+
         if (!this.isWorker) {
           return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
         }
@@ -149,7 +149,7 @@ class Queue extends events.EventEmitter {
 
   /**
    * Update the worker presence.
-   * 
+   *
    * @return {Promise} Resolve when the presence is updated
    */
   updatePresence() {
@@ -173,7 +173,7 @@ class Queue extends events.EventEmitter {
    * added later.
    *
    * Returns a promise resolving when the worker is registered. It will resolve
-   * to a fn that will stop the watch when called. Note that you do not it to 
+   * to a fn that will stop the watch when called. Note that you do not it to
    * call it the auth token expire.
    *
    * It will reject if the worker couldn't register itself.
@@ -183,7 +183,7 @@ class Queue extends events.EventEmitter {
    *
    * TODO:
    * - remove claimed event.
-   * 
+   *
    * @return {Promise}
    */
   watch() {
@@ -198,10 +198,10 @@ class Queue extends events.EventEmitter {
         snapshot => this.sheduleTask(snapshot.key(), snapshot.val()),
         err => {
           this.emit('watchStopped', err);
-          return deregister();  
+          return deregister();
         }
       );
-      
+
       cancel = () => {
         ref.off(eventHandler);
         this.emit('watchStopped');
@@ -218,7 +218,7 @@ class Queue extends events.EventEmitter {
    *
    * The task will be run immedialy or enqueue if if there are to many concurent
    * task running.
-   * 
+   *
    * @param  {string} key  Task id
    * @param  {Object} data Task body
    */
@@ -235,7 +235,7 @@ class Queue extends events.EventEmitter {
 
   /**
    * Async. run a task until the queue is empty.
-   * 
+   *
    * @param  {Object} task Task key and body.
    * @return {Promise}     Resolve when the queue is empty.
    */
@@ -268,16 +268,16 @@ class Queue extends events.EventEmitter {
     ).then(
       () => this.run(this.tasksToRun.shift())
     );
-  
+
   }
 
   /**
    * Claim a task.
    *
    * Resolve when the task is claimed.
-   * 
+   *
    * @param  {Object} task Task key and body.
-   * @return {Promise}     Resolve when the 
+   * @return {Promise}     Resolve when the
    */
   claimTask(task) {
     if (!this.isWorker) {
@@ -285,7 +285,7 @@ class Queue extends events.EventEmitter {
     }
 
     return promisedUpdate(this.taskRef.child(task.key), {
-      workerId: this.authData.uid,
+      worker: this.authData.uid,
       started: true,
       startedAt: Firebase.ServerValue.TIMESTAMP
     }).then(
@@ -298,7 +298,7 @@ class Queue extends events.EventEmitter {
 
   /**
    * Remove claim on a task
-   * 
+   *
    * @param  {Object} task Task key and body
    * @return {Promise}     Resolve when claim is removed.
    */
@@ -308,7 +308,7 @@ class Queue extends events.EventEmitter {
     }
 
     return promisedUpdate(this.taskRef.child(task.key), {
-      workerId: null,
+      worker: null,
       started: false,
       startedAt: null
     }).then(
@@ -321,7 +321,7 @@ class Queue extends events.EventEmitter {
 
   /**
    * Save task result to firebase DB.
-   * 
+   *
    * @param  {Object} task    Task key and body.
    * @param  {Object} results Task result.
    * @return {Promise}        Resolve when result is saved.
@@ -347,7 +347,7 @@ class Queue extends events.EventEmitter {
    * Remove any claim on the task in the queue and reset it.
    *
    * TODO: remove old client and old claim.
-   * 
+   *
    * @return {Promise}.
    */
   cleanUp() {

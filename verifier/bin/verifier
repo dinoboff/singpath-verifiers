@@ -93,6 +93,7 @@ function logEvents(q) {
   q.on('watchStopped', err => console.error(`Watch stopped: ${err.toString()}.`));
   q.on('taskRunScheduled', (key, task) => console.error(`Task schedule (${key}): ${JSON.stringify(task)}.`));
   q.on('taskClaimed', key => console.error(`Task ${key} claimed.`));
+  q.on('taskClaimFailed', (key, err) => console.error(`Task ${key} claim failed: ${err.toString()}.`));
   q.on('taskRun', (key, results) => console.error(`Task ${key} run: ${JSON.stringify(results)}.`));
   q.on('taskResultSave', (key) => console.error(`Task ${key} saved.`));
   q.on('taskResultSavingFailed', (key) => console.error(`Failed to save task ${key}.`));
