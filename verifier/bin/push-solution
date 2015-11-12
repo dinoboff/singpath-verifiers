@@ -5,8 +5,9 @@
 const queue = require('../src/queue');
 const yaml = require('js-yaml');
 
-const FBSECRET = process.env.SINGPATH_FIREBASE_SECRET;
-const FBENDPOINT = process.env.SINGPATH_FIREBASE_QUEUE;
+const FB_SECRET = process.env.SINGPATH_FIREBASE_SECRET;
+const FB_ENDPOINT = process.env.SINGPATH_FIREBASE_QUEUE;
+const FB_USER_ID = process.env.SINGPATH_PUSH_USER_ID || '#1';
 
 const BINNAME = process.argv[1].split('/').pop();
 const USAGE = `
@@ -90,15 +91,15 @@ function pushSolutions(q, solutions) {
 function main() {
   let q, input, solutions, generator, authToken;
 
-  if (!FBENDPOINT) {
+  if (!FB_ENDPOINT) {
     console.error('Firebase queue path is missing. Please set the SINGPATH_FIREBASE_QUEUE environment variable.');
     process.exit(128);
-  } else if (!FBSECRET) {
+  } else if (!FB_SECRET) {
     console.error('Firebase secret is missing. Please the SINGPATH_FIREBASE_SECRET environment variable.');
     process.exit(129);
   } else {
-    console.log(`Will use queue at ${FBENDPOINT}`);
-    q = queue.queue(FBENDPOINT);
+    console.log(`Will use queue at ${FB_ENDPOINT}`);
+    q = queue.queue(FB_ENDPOINT);
   }
 
   input = process.argv.pop();
@@ -115,8 +116,8 @@ function main() {
   }
 
   console.log('Generating auth token...');
-  generator = queue.tokenGenerator(FBSECRET);
-  authToken = generator.user('#1');
+  generator = queue.tokenGenerator(FB_SECRET);
+  authToken = generator.user(FB_USER_ID);
 
   console.log('Authenticating client...');
   return q.auth(authToken).then(() => {

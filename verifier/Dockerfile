@@ -13,6 +13,7 @@ ENV SINGPATH_DOCKER_CERT_PATH="/cert"
 
 ENV SINGPATH_FIREBASE_SECRET=""
 ENV SINGPATH_FIREBASE_QUEUE="https://singpath-play.firebaseio.com/singpath/queues/default"
+ENV SINGPATH_PUSH_USER_ID="#1"
 
 # Update npm, the docker client (for developpement) and create expected folders.
 RUN npm install npm -g && \

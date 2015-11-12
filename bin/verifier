@@ -94,6 +94,88 @@ def start(opts):
         subprocess.Popen(['docker', 'kill', container_name]).wait()
 
 
+def push(opts):
+    if opts.skip_build:
+        logging.info('Skipping building verifier docker images.')
+    else:
+        logging.info('Building verifier docker images...')
+        build_verifier()
+
+    settings = get_settings(opts.machine)
+    if settings[FB_SECRET] is None:
+        logging.error('Firebase secret is missing.')
+        exit(129)
+
+    queue_url = "https://%s.firebaseio.com/singpath/queues/%s" % (
+        settings[FB_ID_KEY],
+        settings[FB_QUEUE_KEY],
+    )
+
+    container_name = 'pusher-machine-%s' % opts.machine
+
+    cmd = [
+        'docker', 'run', '--rm', '--name', container_name,
+        '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
+        '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
+        '-e', 'SINGPATH_PUSH_USER_ID=%s' % opts.user_id,
+        'singpath/verifier2', '/app/bin/push-solution', opts.payload
+    ]
+
+    try:
+        logging.info('Starting pusher container as %s...', container_name)
+        docker = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            stdin=subprocess.PIPE,
+        )
+        return docker.wait()
+    except KeyboardInterrupt as e:
+        logging.info('Stopping container %s...', container_name)
+        docker.terminate()
+        subprocess.Popen(['docker', 'kill', container_name]).wait()
+
+
+def test(opts):
+    images = dict(load_images())
+    print(images)
+    image = images.get(opts.language)
+    print(image)
+    image_name, image_path = image
+    print(image_name, image_path)
+
+    if image_name is None or image_path is None:
+        logging.error('Docker image for %s is not defined in images.json')
+        exit(128)
+
+    if opts.skip_build:
+        logging.info('Skipping building verifier docker images.')
+    else:
+        logging.info('Building verifier docker images...')
+        build(image_name, image_path)
+
+    container_name = 'test-payload-%s' % opts.language
+
+    cmd = [
+        'docker', 'run', '--rm', '--name', container_name,
+        image_name, 'verify', opts.payload
+    ]
+
+    try:
+        logging.info('Starting tester container as %s...', container_name)
+        docker = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            stdin=subprocess.PIPE,
+        )
+        return docker.wait()
+    except KeyboardInterrupt as e:
+        logging.info('Stopping container %s...', container_name)
+        docker.terminate()
+        subprocess.Popen(['docker', 'kill', container_name]).wait()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
@@ -127,6 +209,16 @@ def parse_args():
     )
     init_parser.set_defaults(func=init)
 
+    build_parser = subparsers.add_parser(
+        'build',
+        help='build required docker images',
+        description=(
+            'Build docker images for the verifier daemon and '
+            'the language verifiers'
+        ),
+    )
+    build_parser.set_defaults(func=build_all)
+
     start_parser = subparsers.add_parser(
         'start',
         help='start verifier',
@@ -139,7 +231,7 @@ def parse_args():
     start_parser.add_argument(
         '-s', '--skip-build',
         action='store_true',
-        help='use already built/pulled containers'
+        help='use already built/pulled images'
     )
     start_parser.add_argument(
         'machine',
@@ -148,6 +240,47 @@ def parse_args():
         default='default'
     )
     start_parser.set_defaults(func=start)
+
+    push_parser = subparsers.add_parser(
+        'push',
+        help='push task(s)',
+        description=('Push start to the queue a marchine targetting'),
+    )
+    push_parser.add_argument(
+        '-s', '--skip-build',
+        action='store_true',
+        help='use already built/pulled image'
+    )
+    push_parser.add_argument(
+        '-u', '--user-id',
+        help='user id of the pushed task owner',
+        default='default-task-user'
+    )
+    push_parser.add_argument(
+        'machine',
+        help='machine to use settings from (default: %(default)s)',
+        nargs='?',
+        default='default'
+    )
+    push_parser.add_argument(
+        'payload',
+        help='Payload(s), json or yaml encoded, to send the queue'
+    )
+    push_parser.set_defaults(func=push)
+
+    test_parser = subparsers.add_parser(
+        'test',
+        help='test a problem/solution',
+        description='test a problem/solution against the language verifier.'
+    )
+    test_parser.add_argument(
+        '-s', '--skip-build',
+        action='store_true',
+        help='use already built/pulled docker image'
+    )
+    test_parser.add_argument('language', help='Language of the problem')
+    test_parser.add_argument('payload', help='yaml/json encoded problem')
+    test_parser.set_defaults(func=test)
 
     return parser.parse_args()
 
@@ -161,10 +294,13 @@ def build(image, path):
     )
     return docker.wait()
 
-
-def build_all():
+def build_verifier():
     build('singpath/verifier2:latest', './verifier')
-    for name, path in load_images():
+
+
+def build_all(opts=None):
+    build_verifier()
+    for _, (name, path,) in load_images():
         build('%s:latest' % name, path)
 
 
@@ -179,8 +315,8 @@ def load_images():
 
     with open(join('./images.json')) as fd:
         images = json.load(fd)
-        for image in images.itervalues():
-            yield image['name'], join(image['path'])
+        for name, image in images.iteritems():
+            yield name, (image['name'], join(image['path']))
 
 
 def prompt(msg, default):

@@ -122,14 +122,6 @@ cd ./dummy
 docker build -t singpath/verifier2-dummy:latest .
 ```
 
-To try it:
-```shell
-docker run -ti --rm singpath/verifier2-dummy:latest verify '{
-	"tests": "",
-	"solution": "print(\"TODO\")"
-}'
-```
-
 You would also need to add the image to `images.json`:
 ```json
 {
@@ -140,10 +132,68 @@ You would also need to add the image to `images.json`:
 }
 ```
 
+To try it with:
+```shell
+docker run -ti --rm singpath/verifier2-dummy:latest verify '{
+	"tests": "",
+	"solution": "print(\"TODO\")"
+}'
+```
+
+or:
+```shell
+./bin/verifier test dummy '{
+	"tests": "",
+	"solution": "print(\"TODO\")"
+}'
+```
+
+
 
 ## Pushing task to the queue
 
-A task body should have a payload, an owner and all flags set to false:
+
+E.g. Pushing two tasks to the queue the default machine setting is targeting:
+
+```shell
+./bin/verifier push default '---
+language: java
+tests: |
+  SingPath sp = new SingPath();
+  assertEquals(4.0, sp.add(2.0, 2.0));
+solution: |
+  public class SingPath {
+
+    public Double add(Double x, Double y) {
+      return x + y;
+    }
+  }
+---
+language: java
+tests: |
+  SingPath sp = new SingPath();
+  assertEquals(2.0, sp.echo(2.0));
+solution: |
+  public class SingPath {
+    public Double echo(Double x) {
+      return x;
+    }
+  }
+'
+```
+
+Or to push a file content, you could use:
+```shell
+./bin/verifier push default "$(< ./some-file.yaml)"
+```
+
+You can use yaml (must start with "---") to push one or many document at once
+or json to encode the payload. Yaml is easier to use when writing
+blocks (using "|") of text.
+
+
+The push command will send to
+"https://your-firebase-idfirebaseio.com/singpath/queues/my-queue/tasks/some-task-id":
 ```
 {
 	"payload": {
@@ -151,22 +201,21 @@ A task body should have a payload, an owner and all flags set to false:
 		"tests": "...",
 		"solutions": "..."
 	},
-	"owner": "user-auth-id",
+	"owner": "defaul-pusher-user",
 	"started": false,
 	"completed": false,
 	"archived": false
 }
 ```
 
-It should be saved at
-"https://your-firebase-idfirebaseio.com/singpath/queues/my-queue/tasks/some-task-id".
-
-TODO: add command to push the task.
-
+To push a file content, you could use:
+```shell
+./bin/verifier push default "$(< ./some-file.yaml)"
+```
 
 ## TODO
 
 - setup [circleci.com](https://circleci.com/docs/docker) continuous tests.
 - clean up after failing or exiting verifier worker.
-- implement python and javascript (simply switch the current verifiers server
+- implement python and javascript verifier (simply switch the current verifiers server
   api for a cli).

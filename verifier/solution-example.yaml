@@ -1,40 +1,23 @@
 ---
 language: java
-tests: "assertEquals(2 , 2);"
+tests: |
+  SingPath sp = new SingPath();
+  assertEquals(4.0, sp.add(2.0, 2.0));
 solution: |
   public class SingPath {
-    public Double add() {
-      return 2.0;
+
+    public Double add(Double x, Double y) {
+      return x + y;
     }
   }
-expected: true
 ---
 language: java
-tests: "assertEquals(2 , 2);"
+tests: |
+  SingPath sp = new SingPath();
+  assertEquals(2.0, sp.echo(2.0));
 solution: |
   public class SingPath {
-    public Double add() {
-      return 2.0;
+    public Double echo(Double x) {
+      return x;
     }
   }
-expected: true
----
-language: java
-tests: "assertEquals(2 , 2);"
-solution: |
-  public class SingPath {
-     public Double add() {
-        return 2.0;
-     }
-   }
-expected: true
----
-language: java
-tests: "assertEquals(2 , 2);"
-solution: |
-  public class SingPath {
-    public Double add() {
-      return 2.0;
-    }
-  }
-expected: true
