@@ -38,8 +38,10 @@ def main():
 
 def init(opts):
     settings = load_setting()
-    machine_id, machine_settings = ask_settings(settings)
-    machine_id, machine_settings = set_socket_id(machine_id, machine_settings)
+    machine_id, machine_settings = ask_settings(settings, opts)
+    machine_id, machine_settings = set_socket_id(
+        machine_id, machine_settings, opts
+    )
     save_settings(settings, machine_id, machine_settings)
 
     logging.info(
@@ -55,7 +57,7 @@ def start(opts):
         logging.info('Building required docker images...')
         build_all()
 
-    settings = get_settings(opts.machine)
+    settings = get_settings(opts.machine_id, opts=opts)
     if settings[DOCKER_GID] is None:
         logging.error('Docker socket group id is missing.')
         exit(128)
@@ -68,7 +70,7 @@ def start(opts):
         settings[FB_ID_KEY],
         settings[FB_QUEUE_KEY],
     )
-    container_name = 'machine-%s' % opts.machine
+    container_name = 'machine-%s' % opts.machine_id
 
     cmd = [
         'docker', 'run', '--rm', '--name', container_name,
@@ -102,7 +104,7 @@ def push(opts):
         logging.info('Building verifier docker images...')
         build_verifier()
 
-    settings = get_settings(opts.machine)
+    settings = get_settings(opts.machine_id)
     if settings[FB_SECRET] is None:
         logging.error('Firebase secret is missing.')
         exit(129)
@@ -112,7 +114,7 @@ def push(opts):
         settings[FB_QUEUE_KEY],
     )
 
-    container_name = 'pusher-machine-%s' % opts.machine
+    container_name = 'pusher-machine-%s' % opts.machine_id
 
     cmd = [
         'docker', 'run', '--rm', '--name', container_name,
@@ -208,6 +210,10 @@ def parse_args():
             'its own settings.'
         ),
     )
+    init_parser.add_argument('-m', '--machine-id')
+    init_parser.add_argument('-f', '--firebase-id')
+    init_parser.add_argument('-d', '--firebase-queue')
+    init_parser.add_argument('-g', '--docker-gid')
     init_parser.set_defaults(func=init)
 
     build_parser = subparsers.add_parser(
@@ -235,17 +241,19 @@ def parse_args():
         help='use already built/pulled images'
     )
     start_parser.add_argument(
-        'machine',
+        '-m', '--machine-id',
         help='machine to start (default: %(default)s)',
-        nargs='?',
         default='default'
     )
+    start_parser.add_argument('-f', '--firebase-id')
+    start_parser.add_argument('-d', '--firebase-queue')
+    start_parser.add_argument('-g', '--docker-gid')
     start_parser.set_defaults(func=start)
 
     push_parser = subparsers.add_parser(
         'push',
         help='push task(s)',
-        description=('Push start to the queue a marchine targetting'),
+        description=('Push task(s) to the queue a marchine targetting'),
     )
     push_parser.add_argument(
         '-s', '--skip-build',
@@ -258,11 +266,11 @@ def parse_args():
         default='default-task-user'
     )
     push_parser.add_argument(
-        'machine',
-        help='machine to use settings from (default: %(default)s)',
-        nargs='?',
-        default='default'
+        '-m', '--machine-id',
+        help='machine to use settings from',
     )
+    push_parser.add_argument('-f', '--firebase-id')
+    push_parser.add_argument('-d', '--firebase-queue')
     push_parser.add_argument(
         'payload',
         help='Payload(s), json or yaml encoded, to send the queue'
@@ -339,12 +347,24 @@ def load_setting():
         return {}
 
 
-def get_settings(machine_id, settings=None):
+def get_settings(machine_id, settings=None, opts=None):
     settings = settings if settings is not None else load_setting()
     machine_settings = {}
     machine_settings.update(DEFAULT_SETTINGS)
     machine_settings.update(settings.get(machine_id, {}))
+    update_settings(machine_settings, opts)
     return machine_settings
+
+
+def update_settings(settings, opts):
+    if opts is None:
+        return
+    if opts.firebase_id:
+        settings[FB_ID_KEY] = opts.firebase_id
+    if opts.firebase_queue:
+        settings[FB_QUEUE_KEY] = opts.firebase_queue
+    if opts.docker_gid:
+        settings[DOCKER_GID] = opts.docker_gid
 
 
 def save_settings(settings, machine_id, machine_settings):
@@ -361,22 +381,28 @@ def save_settings(settings, machine_id, machine_settings):
             return output
 
 
-def ask_settings(settings):
-    machine_id = prompt('Machine ID', 'default')
+def ask_settings(settings, opts):
+    machine_id = opts.machine_id if opts.machine_id else prompt(
+        'Machine ID', 'default'
+    )
     machine_settings = get_settings(machine_id, settings=settings)
 
-    machine_settings[FB_ID_KEY] = prompt(
-        '\n\nFirebase ID',
-        machine_settings[FB_ID_KEY]
+    machine_settings[FB_ID_KEY] = (
+        opts.firebase_id if opts.firebase_id else prompt(
+            '\nFirebase ID',
+            machine_settings[FB_ID_KEY]
+        )
     )
 
-    machine_settings[FB_QUEUE_KEY] = prompt(
-        '\n\nFirebase queue name',
-        machine_settings[FB_QUEUE_KEY]
+    machine_settings[FB_QUEUE_KEY] = (
+        opts.firebase_queue if opts.firebase_queue else prompt(
+            '\nFirebase queue name',
+            machine_settings[FB_QUEUE_KEY]
+        )
     )
 
     error(
-        '\n\nYour firebase secret is available at '
+        '\nYour firebase secret is available at '
         'https://%s.firebaseio.com/?page=Admin' % machine_settings[FB_ID_KEY]
     )
     firebase_secret = getpass.getpass(
@@ -389,9 +415,13 @@ def ask_settings(settings):
     return machine_id, machine_settings
 
 
-def set_socket_id(machine_id, settings):
+def set_socket_id(machine_id, settings, opts):
     logging.info('Guessing machine\'s docker socket group id...')
-    gid = local_socket_gid()
+
+    gid = opts.docker_gid
+    if gid is None:
+        gid = local_socket_gid()
+
     if gid is None:
         gid = remote_socket_gid(machine_id)
 
