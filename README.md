@@ -19,7 +19,7 @@ On OS X and Windows, you should install
 [Docker Tools](https://www.docker.com/docker-toolbox); it will include
 docker, docker-machine and VirtualBox.
 
-On Windows, install git usually include a bash terminal.
+On Windows, git usually includes a bash terminal.
 
 
 ## Setup
@@ -33,7 +33,7 @@ verifier to run on it.
 4. configure the verifier for this machine: `cd singpath-verifiers; ./bin/verifier init`;
 5. upload the rules (WIP: The rules are not yet public).
 
-TODO: publish rules or partial rules related to rules.
+TODO: publish rules or partial rules related to task queue.
 
 
 ## Running the verifier
@@ -66,10 +66,10 @@ the json encode result object. It must have a boolean "solved" field; typically
 something like this:
 
 ```json
-{"results": [{"call": "x", "expected": 2, "received": "2", "correct": True},
-             {"call": "y", "expected": 3, "received": "2", "correct": False}],
-"printed": ",
-"solved": False,}
+{"results": [{"call": "x", "expected": 2, "received": "2", "correct": true},
+             {"call": "y", "expected": 3, "received": "2", "correct": false}],
+"printed": "",
+"solved": false,}
 ```
 
 These results from verifying code are usually used to build a table to provide
@@ -127,25 +127,25 @@ You would also need to add the image to `verifier/images.json`:
 {
     "java": {
         "name": "singpath/verifier2-java",
-        "path": "./verifier/verifiers/java"
+        "path": "./verifiers/java"
     },
     "javascript": {
         "name": "singpath/verifier2-javascript",
-        "path": "./verifier/verifiers/javascript"
+        "path": "./verifiers/javascript"
     },
     "python": {
         "name": "singpath/verifier2-python",
-        "path": "./verifier/verifiers/python"
+        "path": "./verifiers/python"
     },
     "dummy": {
         "name": "singpath/verifier2-dummy",
-        "path": "./verifier/verifiers/dummy"
+        "path": "./verifiers/dummy"
     }
 }
 
 ```
 
-To try it with:
+Try it with:
 ```shell
 docker run -ti --rm singpath/verifier2-dummy:latest verify '{
 	"tests": "",
