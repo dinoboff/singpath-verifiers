@@ -190,7 +190,7 @@ def parse_args():
         )
     )
     parser.add_argument(
-        '-q', '--quiet',
+        '-s', '--quiet',
         action='store_const', dest='level', const=logging.WARNING
     )
     parser.add_argument(
@@ -212,7 +212,7 @@ def parse_args():
     )
     init_parser.add_argument('-m', '--machine-id')
     init_parser.add_argument('-f', '--firebase-id')
-    init_parser.add_argument('-d', '--firebase-queue')
+    init_parser.add_argument('-q', '--firebase-queue')
     init_parser.add_argument('-g', '--docker-gid')
     init_parser.set_defaults(func=init)
 
@@ -246,7 +246,7 @@ def parse_args():
         default='default'
     )
     start_parser.add_argument('-f', '--firebase-id')
-    start_parser.add_argument('-d', '--firebase-queue')
+    start_parser.add_argument('-q', '--firebase-queue')
     start_parser.add_argument('-g', '--docker-gid')
     start_parser.set_defaults(func=start)
 
@@ -270,7 +270,7 @@ def parse_args():
         help='machine to use settings from',
     )
     push_parser.add_argument('-f', '--firebase-id')
-    push_parser.add_argument('-d', '--firebase-queue')
+    push_parser.add_argument('-q', '--firebase-queue')
     push_parser.add_argument(
         'payload',
         help='Payload(s), json or yaml encoded, to send the queue'
