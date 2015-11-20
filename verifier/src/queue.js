@@ -21,6 +21,7 @@ class Queue extends events.EventEmitter {
     this.queueName = this.ref.key();
     this.taskRef = this.ref.child('tasks');
     this.workerRef = this.ref.child('workers');
+    this.solutionRefMaker = (task) => this.ref.parent().parent().parent().child(task.solutionRef);
     this.dockerClient = dockerClient;
 
     this.tasksToRun = new FIFO();
@@ -97,7 +98,7 @@ class Queue extends events.EventEmitter {
     return promisedPush(this.taskRef, {
       started: false,
       completed: false,
-      archived: false,
+      consumed: false,
       owner: this.authData.uid,
       payload: payload
     });
@@ -331,15 +332,53 @@ class Queue extends events.EventEmitter {
       return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
     }
 
-    return promisedUpdate(this.taskRef.child(task.key), {
-      results: results,
-      completedAt: Firebase.ServerValue.TIMESTAMP,
-      completed: true
-    }).then(
+    let promiseReturn;
+
+    if (task && task.data && task.data.solutionRef) {
+      promiseReturn = this.savePushTaskResults(task, results);
+    } else {
+      promiseReturn = this.savePullTaskResults(task, results);
+    }
+
+    return promiseReturn.then(
       () => this.emit('taskResultSave', task.key)
     ).catch(err => {
       this.emit('taskResultSavingFailed', err);
       return Promise.reject(err);
+    });
+  }
+
+  savePushTaskResults(task, results) {
+    if (!this.isWorker) {
+      return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
+    }
+
+    if (!task.data.solutionRef) {
+      return Promise.reject(new Error('The task is not a Push task'));
+    }
+
+    return promisedUpdate(this.solutionRefMaker(task.data), {
+      ['results/' + task.key]: results,
+      'meta/verified': true,
+      'meta/solved': results.solved
+    }).then(() => {
+      return promisedUpdate(this.taskRef.child(task.key), {
+        completedAt: Firebase.ServerValue.TIMESTAMP,
+        completed: true,
+        consumed: true
+      });
+    });
+  }
+
+  savePullTaskResults(task, results) {
+    if (!this.isWorker) {
+      return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
+    }
+
+    return promisedUpdate(this.taskRef.child(task.key), {
+      results: results,
+      completedAt: Firebase.ServerValue.TIMESTAMP,
+      completed: true
     });
   }
 
