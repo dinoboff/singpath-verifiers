@@ -82,8 +82,28 @@ def start(opts):
         'singpath/verifier2', '/app/bin/verifier'
     ]
 
+    if opts.daemon:
+        cmd.remove('--rm')
+        cmd.insert(2, '-d')
+        logging.info(
+            'Starting verifier container in daemon mode as %s...',
+            container_name
+        )
+        docker = subprocess.Popen(cmd)
+        return docker.wait()
+
+    cmd = [
+        'docker', 'run', '--rm', '--name', container_name,
+        '-v', '/var/run/docker.sock:/var/run/docker.sock',
+        '--group-add', str(settings[DOCKER_GID]),
+        '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
+        '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
+        '-e', 'SINGPATH_SKIP_BUILD=skip',
+        'singpath/verifier2', '/app/bin/verifier'
+    ]
+
     try:
-        logging.info('Starting container as %s...', container_name)
+        logging.info('Starting verifier container as %s...', container_name)
         docker = subprocess.Popen(
             cmd,
             stdout=sys.stdout,
@@ -248,6 +268,7 @@ def parse_args():
     start_parser.add_argument('-f', '--firebase-id')
     start_parser.add_argument('-q', '--firebase-queue')
     start_parser.add_argument('-g', '--docker-gid')
+    start_parser.add_argument('-d', '--daemon', action='store_true')
     start_parser.set_defaults(func=start)
 
     push_parser = subparsers.add_parser(
