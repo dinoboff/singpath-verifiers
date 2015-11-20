@@ -111,7 +111,7 @@ def start(opts):
             stdin=subprocess.PIPE,
         )
         return docker.wait()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         logging.info('Stopping container %s...', container_name)
         docker.terminate()
         subprocess.Popen(['docker', 'kill', container_name]).wait()
@@ -153,7 +153,7 @@ def push(opts):
             stdin=subprocess.PIPE,
         )
         return docker.wait()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         logging.info('Stopping container %s...', container_name)
         docker.terminate()
         subprocess.Popen(['docker', 'kill', container_name]).wait()
@@ -168,7 +168,9 @@ def test(opts):
     print(image_name, image_path)
 
     if image_name is None or image_path is None:
-        logging.error('Docker image for %s is not defined in verifier/images.json')
+        logging.error(
+            'Docker image for %s is not defined in verifier/images.json'
+        )
         exit(128)
 
     if opts.skip_build:
@@ -193,7 +195,7 @@ def test(opts):
             stdin=subprocess.PIPE,
         )
         return docker.wait()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         logging.info('Stopping container %s...', container_name)
         docker.terminate()
         subprocess.Popen(['docker', 'kill', container_name]).wait()
@@ -325,6 +327,7 @@ def build(image, path):
     code = docker.wait()
     if code != 0:
         exit(code)
+
 
 def build_verifier():
     build('singpath/verifier2:latest', './verifier')
