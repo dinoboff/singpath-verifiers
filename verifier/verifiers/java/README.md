@@ -25,7 +25,7 @@ solution: |
 '
 ```
 
-You can provide the the solution/tests payload as JSON or YAML. If in YAML, the
+You can provide the solution/tests payload as JSON or YAML. If in YAML, the
 YAML document must start with "---".
 
 To pass the content of a file:
