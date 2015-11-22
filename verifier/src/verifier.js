@@ -69,14 +69,15 @@ class VerifierError extends Error {
 class Verifier {
 
   /**
-   * Verifier constructor
+   * Verifier constructor.
    *
    * @param  {dockerode.Container} container A container with TTY set to false.
-   * @return {Verifier}              [description]
+   * @return {Verifier}
    */
-  constructor(container) {
+  constructor(container, logger) {
     this.container = container;
     this.out = undefined;
+    this.logger = logger;
   }
 
   _wrapWithData(meth) {
@@ -188,7 +189,7 @@ exports.run = function run(client, payload, logger) {
       if (err) {
         reject(err);
       } else {
-        resolve(new Verifier(container));
+        resolve(new Verifier(container, logger));
       }
     });
   }).then(

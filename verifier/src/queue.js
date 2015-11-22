@@ -13,15 +13,15 @@ const DEFAULT_MAX_WORKER = 10;
 
 class Queue extends events.EventEmitter {
 
-  constructor(endpoint, dockerClient, options) {
+  constructor(endpoint, dockerClient, logger, options) {
     super();
 
+    this.logger = logger || console;
     this.endpoint = endpoint;
     this.ref = new Firebase(endpoint);
     this.queueName = this.ref.key();
     this.taskRef = this.ref.child('tasks');
     this.workerRef = this.ref.child('workers');
-    this.solutionRefMaker = (task) => this.ref.parent().parent().parent().child(task.solutionRef);
     this.dockerClient = dockerClient;
 
     this.tasksToRun = new FIFO();
@@ -120,7 +120,7 @@ class Queue extends events.EventEmitter {
       startedAt: Firebase.ServerValue.TIMESTAMP,
       presence: Firebase.ServerValue.TIMESTAMP
     }).then(ref => {
-      this.emit('workerRegistered', ref);
+      this.logger.info('Worker registered.');
 
       let timer, stopTimer;
 
@@ -132,7 +132,7 @@ class Queue extends events.EventEmitter {
         if (timer !== undefined) {
           clearInterval(timer);
           timer = undefined;
-          this.emit('workerPresenceUpdateStopped');
+          this.logger.debug('Stopping updating presence.');
         }
       };
 
@@ -143,7 +143,7 @@ class Queue extends events.EventEmitter {
           return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
         }
 
-        return promisedSet(ref, null).then(() => this.emit('workerRemoved', ref));
+        return promisedSet(ref, null).then(() => this.logger.info('Worker removed.'));
       };
     });
   }
@@ -162,9 +162,9 @@ class Queue extends events.EventEmitter {
       this.workerRef.child(this.authData.uid).child('presence'),
       Firebase.ServerValue.TIMESTAMP
     ).then(
-      () => this.emit('workerPresenceUpdated')
+      () => this.logger.info('Worker presence updated')
     ).catch(err => {
-      this.emit('workerPresenceUpdateFailed', err);
+      this.logger.error('Failed to update worker presence: %s', err.toString());
       return Promise.reject(err);
     });
   }
@@ -199,6 +199,7 @@ class Queue extends events.EventEmitter {
         snapshot => this.sheduleTask(snapshot.key(), snapshot.val()),
         err => {
           this.emit('watchStopped', err);
+          this.logger.error('Watch on new task failed unexpectively: %s', err.toString());
           return deregister();
         }
       );
@@ -206,10 +207,12 @@ class Queue extends events.EventEmitter {
       cancel = () => {
         ref.off(eventHandler);
         this.emit('watchStopped');
+        this.logger.info('Watch on new task stopped.');
         return deregister();
       };
 
       this.emit('watchStarted', ref, cancel);
+      this.logger.info('Starting watching for new task.');
       return cancel;
     });
   }
@@ -225,7 +228,8 @@ class Queue extends events.EventEmitter {
    */
   sheduleTask(key, data) {
     this.tasksToRun.push({key, data});
-    this.emit('taskRunScheduled', key, data);
+    this.logger.info('Task ("%s") run scheduled', key);
+    this.logger.debug('Task ("%s") run scheduled with "%j"', key, data);
 
     if (this.taskRunning >= this.opts.maxWorker) {
       return;
@@ -253,14 +257,15 @@ class Queue extends events.EventEmitter {
     ).then(
       () => verifier.run(this.dockerClient, task.data.payload)
     ).then(results => {
-      this.emit('taskRun', task.key, results);
+      this.logger.info('Task ("%s") run.', task.key);
+      this.logger.debug('Task ("%s") run: "%j".', task.key, results);
       return this.saveTaskResults(task, results);
     }).catch(err => {
       if (err === skip) {
         return;
       }
 
-      this.emit('taskRunFailed', task.key, err);
+      this.logger.info('Task ("%s") failed running: %s.\n%s', task.key, err.toString(), err.stack);
       return this.removeTaskClaim(task);
     }).then(
       // Regardless of promise settlement, recover and decrease task running count.
@@ -290,9 +295,9 @@ class Queue extends events.EventEmitter {
       started: true,
       startedAt: Firebase.ServerValue.TIMESTAMP
     }).then(
-      () => this.emit('taskClaimed', task.key)
+      () => this.logger.info('Task ("%s") claimed.', task.key)
     ).catch(err => {
-      this.emit('taskClaimFailed', task.key, err);
+      this.logger.debug('Failed to claim task ("%s"): %s', task.key, err.toString());
       return Promise.reject(err);
     });
   }
@@ -313,9 +318,9 @@ class Queue extends events.EventEmitter {
       started: false,
       startedAt: null
     }).then(
-      () => this.emit('taskClaimRemoved', task.key)
+      () => this.logger.info('Task ("%s") claim removed.', task.key)
     ).catch(err => {
-      this.emit('taskClaimRemovalFailed', err);
+      this.logger.error('Failed to remove task claim("%s"): %s', task.key, err.toString());
       return Promise.reject(err);
     });
   }
@@ -341,11 +346,15 @@ class Queue extends events.EventEmitter {
     }
 
     return promiseReturn.then(
-      () => this.emit('taskResultSave', task.key)
+      () => this.logger.info('Task ("%s") results saved.', task.key)
     ).catch(err => {
-      this.emit('taskResultSavingFailed', err);
+      this.logger.error('Failed to save task results("%s"): %s', task.key, err.toString());
       return Promise.reject(err);
     });
+  }
+
+  solutionRefMaker(task) {
+    return this.ref.parent().parent().parent().child(task.solutionRef);
   }
 
   savePushTaskResults(task, results) {
@@ -405,7 +414,7 @@ class Queue extends events.EventEmitter {
  * @param  {string} endpoint Full firbase URL to a SingPath queue.
  * @return {Queue}
  */
-exports.queue = (endpoint, dockerClient) => new Queue(endpoint, dockerClient);
+exports.queue = (endpoint, dockerClient, logger) => new Queue(endpoint, dockerClient, logger);
 
 /**
  * Return a auth token generator.
