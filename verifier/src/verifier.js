@@ -80,22 +80,33 @@ class Verifier {
     this.logger = logger;
   }
 
-  _wrapWithData(meth) {
-    const args = Array.from(arguments).slice(1);
-
+  /**
+   * Warp container method to return a promise.
+   * 
+   * @param  {Function} meth container method to wrap.
+   * @param  {Object}   opts options to pass to the method call
+   * @return {Promise}
+   */
+  _wrap(meth, opts) {
     return new Promise((resolve, reject) => {
-      meth.apply(this.container, args.concat((err, data) => {
+      const cb = (err, data) => {
         if (err) {
           reject(new VerifierError(err, this));
         } else {
           resolve(data);
         }
-      }));
+      };
+
+      if (opts === undefined) {
+        meth.call(this.container, cb);
+      } else {
+        meth.call(this.container, opts, cb);
+      }
     });
   }
 
-  _wrap() {
-    return this._wrapWithData.apply(this, arguments).then(() => this);
+  _wrapChain(meth, opts) {
+    return this._wrap(meth, opts).then(() => this);
   }
 
   /**
@@ -106,7 +117,7 @@ class Verifier {
    *
    */
   attach() {
-    return this._wrapWithData(this.container.attach, {stream: true, stdout: true, stderr: true}).then(stream => {
+    return this._wrap(this.container.attach, {stream: true, stdout: true, stderr: true}).then(stream => {
       this.out = new Response(this.container, stream);
       return this;
     });
@@ -118,7 +129,7 @@ class Verifier {
    * @return {Promise} Resolve to the verifier once the the container is started.
    */
   start() {
-    return this._wrap(this.container.start, {});
+    return this._wrapChain(this.container.start, {});
   }
 
   /**
@@ -140,11 +151,9 @@ class Verifier {
       this.container.wait((err) => {
         if (hasTimedOut) {
           return;
-        } else {
-          clearTimeout(to);
         }
 
-
+        clearTimeout(to);
         if (err) {
           reject(err);
         } else {
@@ -160,7 +169,7 @@ class Verifier {
    * @return {Promise}
    */
   remove() {
-    return this._wrap(this.container.remove, {force: true});
+    return this._wrapChain(this.container.remove, {force: true});
   }
 }
 
