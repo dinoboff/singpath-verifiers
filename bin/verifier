@@ -11,6 +11,7 @@ import sys
 
 
 DOCKER_GID = 'dockerGroupId'
+MACHINE_ID_KEY = 'machineId'
 FB_ID_KEY = 'firebaseID'
 FB_QUEUE_KEY = 'firebaseQueueName'
 FB_SECRET = 'firebaseSecret'
@@ -18,6 +19,7 @@ DEFAULT_SETTINGS = {
     FB_ID_KEY: 'singpath-play',
     FB_QUEUE_KEY: 'default',
     FB_SECRET: None,
+    MACHINE_ID_KEY: 'default',
     DOCKER_GID: None,
 }
 
@@ -38,15 +40,15 @@ def main():
 
 def init(opts):
     settings = load_setting()
-    machine_id, machine_settings = ask_settings(settings, opts)
-    machine_id, machine_settings = set_socket_id(
-        machine_id, machine_settings, opts
-    )
-    save_settings(settings, machine_id, machine_settings)
+
+    profile_id, profile_settings = ask_settings(settings, opts)
+    set_socket_id(profile_settings, opts)
+
+    save_settings(settings, profile_id, profile_settings)
 
     logging.info(
-        'Setting for machine "%s" saved into "./.verifier.json"'
-        % machine_id
+        'Setting for profile "%s" saved into "./.singpath-verifiers.json"'
+        % profile_id
     )
 
 
@@ -57,7 +59,7 @@ def start(opts):
         logging.info('Building required docker images...')
         build_all()
 
-    settings = get_settings(opts.machine_id, opts=opts)
+    settings = get_settings(opts.profile_id, opts=opts)
     if settings[DOCKER_GID] is None:
         logging.error('Docker socket group id is missing.')
         exit(128)
@@ -70,7 +72,7 @@ def start(opts):
         settings[FB_ID_KEY],
         settings[FB_QUEUE_KEY],
     )
-    container_name = 'machine-%s' % opts.machine_id
+    container_name = 'verifier-%s' % opts.profile_id
 
     cmd = [
         'docker', 'run', '--rm', '--name', container_name,
@@ -78,9 +80,14 @@ def start(opts):
         '--group-add', str(settings[DOCKER_GID]),
         '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
         '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
-        '-e', 'SINGPATH_SKIP_BUILD=skip',
+        '-e', 'SKIP_BUILD=%s' % ('1' if opts.skip_build else '0'),
         'singpath/verifier2', '/app/bin/verifier'
     ]
+
+    if opts.debug:
+        cmd.push('-d')
+
+    cmd.push('run')
 
     if opts.daemon:
         cmd.remove('--rm')
@@ -91,16 +98,6 @@ def start(opts):
         )
         docker = subprocess.Popen(cmd)
         return docker.wait()
-
-    cmd = [
-        'docker', 'run', '--rm', '--name', container_name,
-        '-v', '/var/run/docker.sock:/var/run/docker.sock',
-        '--group-add', str(settings[DOCKER_GID]),
-        '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
-        '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
-        '-e', 'SINGPATH_SKIP_BUILD=skip',
-        'singpath/verifier2', '/app/bin/verifier'
-    ]
 
     try:
         logging.info('Starting verifier container as %s...', container_name)
@@ -124,7 +121,7 @@ def push(opts):
         logging.info('Building verifier docker images...')
         build_verifier()
 
-    settings = get_settings(opts.machine_id)
+    settings = get_settings(opts.profile_id)
     if settings[FB_SECRET] is None:
         logging.error('Firebase secret is missing.')
         exit(129)
@@ -134,14 +131,14 @@ def push(opts):
         settings[FB_QUEUE_KEY],
     )
 
-    container_name = 'pusher-machine-%s' % opts.machine_id
+    container_name = 'pusher-%s' % opts.profile_id
 
     cmd = [
         'docker', 'run', '--rm', '--name', container_name,
         '-e', 'SINGPATH_FIREBASE_SECRET=%s' % settings[FB_SECRET],
         '-e', 'SINGPATH_FIREBASE_QUEUE=%s' % queue_url,
-        '-e', 'SINGPATH_PUSH_USER_ID=%s' % opts.user_id,
-        'singpath/verifier2', '/app/bin/push-solution', opts.payload
+        '-e', 'SKIP_BUILD=%s' % ('1' if opts.skip_build else '0'),
+        'singpath/verifier2', '/app/bin/verifier', 'push', opts.payload
     ]
 
     try:
@@ -161,11 +158,8 @@ def push(opts):
 
 def test(opts):
     images = dict(load_images())
-    print(images)
     image = images.get(opts.language)
-    print(image)
     image_name, image_path = image
-    print(image_name, image_path)
 
     if image_name is None or image_path is None:
         logging.error(
@@ -182,7 +176,8 @@ def test(opts):
     container_name = 'test-payload-%s' % opts.language
 
     cmd = [
-        'docker', 'run', '--rm', '--name', container_name,
+        'docker', 'run', '--rm',
+        '--name', container_name,
         image_name, 'verify', opts.payload
     ]
 
@@ -227,11 +222,12 @@ def parse_args():
         'init',
         help='configure verifier',
         description=(
-            'Build machine settings to save in .verifier.json. '
+            'Build machine settings to save in ./.singpath-verifiers.json. '
             'Each docker host (machine) you will run the verifier will have '
             'its own settings.'
         ),
     )
+    init_parser.add_argument('-p', '--profile-id')
     init_parser.add_argument('-m', '--machine-id')
     init_parser.add_argument('-f', '--firebase-id')
     init_parser.add_argument('-q', '--firebase-queue')
@@ -263,8 +259,8 @@ def parse_args():
         help='use already built/pulled images'
     )
     start_parser.add_argument(
-        '-m', '--machine-id',
-        help='machine to start (default: %(default)s)',
+        '-p', '--profile-id',
+        help='verifier profile to start (default: %(default)s)',
         default='default'
     )
     start_parser.add_argument('-f', '--firebase-id')
@@ -283,13 +279,13 @@ def parse_args():
         action='store_true',
         help='use already built/pulled image'
     )
+    # push_parser.add_argument(
+    #     '-u', '--user-id',
+    #     help='user id of the pushed task owner',
+    #     default='default-task-user'
+    # )
     push_parser.add_argument(
-        '-u', '--user-id',
-        help='user id of the pushed task owner',
-        default='default-task-user'
-    )
-    push_parser.add_argument(
-        '-m', '--machine-id',
+        '-p', '--profile-id',
         help='machine to use settings from',
     )
     push_parser.add_argument('-f', '--firebase-id')
@@ -364,25 +360,27 @@ def prompt(msg, default):
 def load_setting():
     try:
         logging.info('Loading existing settings...')
-        with open('./.verifier.json') as fp:
+        with open('./.singpath-verifiers.json') as fp:
             return json.load(fp)
     except Exception:
         logging.debug('verifier.json was not found.')
         return {}
 
 
-def get_settings(machine_id, settings=None, opts=None):
+def get_settings(profile_id, settings=None, opts=None):
     settings = settings if settings is not None else load_setting()
-    machine_settings = {}
-    machine_settings.update(DEFAULT_SETTINGS)
-    machine_settings.update(settings.get(machine_id, {}))
-    update_settings(machine_settings, opts)
-    return machine_settings
+    profile_settings = {}
+    profile_settings.update(DEFAULT_SETTINGS)
+    profile_settings.update(settings.get(profile_id, {}))
+    update_settings(profile_settings, opts)
+    return profile_settings
 
 
 def update_settings(settings, opts):
     if opts is None:
         return
+    if opts.machine_id:
+        settings[MACHINE_ID_KEY] = opts.machine_id
     if opts.firebase_id:
         settings[FB_ID_KEY] = opts.firebase_id
     if opts.firebase_queue:
@@ -391,10 +389,10 @@ def update_settings(settings, opts):
         settings[DOCKER_GID] = opts.docker_gid
 
 
-def save_settings(settings, machine_id, machine_settings):
-    settings[machine_id] = machine_settings
+def save_settings(settings, profile_id, profile_settings):
+    settings[profile_id] = profile_settings
     logging.info('Saving settings...')
-    with open('./.verifier.json', 'w') as fp:
+    with open('./.singpath-verifiers.json', 'w') as fp:
             output = json.dumps(
                 settings,
                 sort_keys=True,
@@ -406,40 +404,47 @@ def save_settings(settings, machine_id, machine_settings):
 
 
 def ask_settings(settings, opts):
-    machine_id = opts.machine_id if opts.machine_id else prompt(
-        'Machine ID', 'default'
+    profile_id = opts.profile_id if opts.profile_id else prompt(
+        'Profile ID', 'default'
     )
-    machine_settings = get_settings(machine_id, settings=settings)
+    profile_settings = get_settings(profile_id, settings=settings)
 
-    machine_settings[FB_ID_KEY] = (
-        opts.firebase_id if opts.firebase_id else prompt(
-            '\nFirebase ID',
-            machine_settings[FB_ID_KEY]
+    profile_settings[MACHINE_ID_KEY] = (
+        opts.machine_id if opts.firebase_id else prompt(
+            '\nMachine ID',
+            profile_settings[MACHINE_ID_KEY]
         )
     )
 
-    machine_settings[FB_QUEUE_KEY] = (
+    profile_settings[FB_ID_KEY] = (
+        opts.firebase_id if opts.firebase_id else prompt(
+            '\nFirebase ID',
+            profile_settings[FB_ID_KEY]
+        )
+    )
+
+    profile_settings[FB_QUEUE_KEY] = (
         opts.firebase_queue if opts.firebase_queue else prompt(
             '\nFirebase queue name',
-            machine_settings[FB_QUEUE_KEY]
+            profile_settings[FB_QUEUE_KEY]
         )
     )
 
     error(
         '\nYour firebase secret is available at '
-        'https://%s.firebaseio.com/?page=Admin' % machine_settings[FB_ID_KEY]
+        'https://%s.firebaseio.com/?page=Admin' % profile_settings[FB_ID_KEY]
     )
     firebase_secret = getpass.getpass(
         prompt='\nFirebase secret: ', stream=sys.stderr
     )
-    machine_settings[FB_SECRET] = (
-        firebase_secret if firebase_secret else machine_settings[FB_SECRET]
+    profile_settings[FB_SECRET] = (
+        firebase_secret if firebase_secret else profile_settings[FB_SECRET]
     )
 
-    return machine_id, machine_settings
+    ile_settings
 
 
-def set_socket_id(machine_id, settings, opts):
+def set_socket_id(settings, opts):
     logging.info('Guessing machine\'s docker socket group id...')
 
     gid = opts.docker_gid
@@ -447,22 +452,24 @@ def set_socket_id(machine_id, settings, opts):
         gid = local_socket_gid()
 
     if gid is None:
-        gid = remote_socket_gid(machine_id)
+        gid = remote_socket_gid(settings.get(MACHINE_ID_KEY))
 
     if gid is None:
         logging.warning(
             'Failed to guess the docker socket group id.\n'
             'Find out which group id the verifier needs to gain access '
-            'to the docker socket and assign it to "%s" in ./.verifier.json'
+            'to the docker socket and assign it to "%s" in ./.singpath-verifiers.json'
             % DOCKER_GID
         )
     else:
         settings[DOCKER_GID] = gid
         logging.info('Docker group id is %s', gid)
-    return machine_id, settings
 
 
 def remote_socket_gid(machine_id):
+    if machine_id is None:
+        return
+
     docker_machine = which('docker-machine')
     if docker_machine is None:
         logging.debug('No docker-machine.')

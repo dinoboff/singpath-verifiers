@@ -1,22 +1,10 @@
 'use strict';
 
-const Docker = require('dockerode');
-const fs = require('./promiseFs');
 const Writable = require('stream').Writable;
+
 const verifierImages = require('../images.json');
 
 const DELAY = 6000;
-const SOCKET_PATH = '/var/run/docker.sock';
-
-
-/**
- * Return a Promise resolving to a dockerode client.
- *
- * @return {Promise}
- */
-exports.dockerClient = function dockerClient() {
-  return fs.pathExist(SOCKET_PATH).then(socketPath => new Docker({socketPath}));
-};
 
 /**
  * Writeable stream collecting verifier sdtout stream.
@@ -82,7 +70,7 @@ class Verifier {
 
   /**
    * Warp container method to return a promise.
-   * 
+   *
    * @param  {Function} meth container method to wrap.
    * @param  {Object}   opts options to pass to the method call
    * @return {Promise}
@@ -182,7 +170,7 @@ class Verifier {
  * @param  {Object}    payload
  * @return {Promise}
  */
-exports.run = function run(client, payload, logger) {
+exports.verify = function verify(client, payload, options) {
   if (
     !payload ||
     !payload.language ||
@@ -191,7 +179,9 @@ exports.run = function run(client, payload, logger) {
     return Promise.reject(new Error('Unsupported language.'));
   }
 
-  logger = logger || console;
+  options = options || {};
+  
+  const logger = options.logger || console;
 
   return new Promise((resolve, reject) => {
     client.createContainer(containerOptions(payload), (err, container) => {

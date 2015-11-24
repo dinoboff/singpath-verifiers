@@ -1,8 +1,6 @@
 'use strict';
 
 const Firebase = require('firebase');
-const FirebaseTokenGenerator = require('firebase-token-generator');
-const uuid = require('node-uuid');
 const FIFO = require('./fifo').FIFO;
 const verifier = require('./verifier');
 const events = require('events');
@@ -11,24 +9,29 @@ const DEFAULT_PRESENCE_DELAY = 30000;
 const DEFAULT_MAX_WORKER = 10;
 
 
-class Queue extends events.EventEmitter {
+module.exports = class Queue extends events.EventEmitter {
 
-  constructor(endpoint, dockerClient, logger, options) {
+  constructor(firebaseClient, dockerClient, options) {
     super();
 
-    this.logger = logger || console;
-    this.endpoint = endpoint;
-    this.ref = new Firebase(endpoint);
+    options = options || {};
+
+    this.ref = firebaseClient;
+    this.dockerClient = dockerClient;
+    this.logger = options.logger || console;
+    this.opts = {
+      presenceDelay: options.presenceDelay || DEFAULT_PRESENCE_DELAY,
+      maxWorker: options.maxWorker || DEFAULT_MAX_WORKER
+    };
+
     this.queueName = this.ref.key();
     this.taskRef = this.ref.child('tasks');
     this.workerRef = this.ref.child('workers');
-    this.dockerClient = dockerClient;
 
     this.tasksToRun = new FIFO();
     this.taskRunning = 0;
 
     this.authData = undefined;
-
     this.ref.onAuth(authData => {
       this.authData = authData;
 
@@ -38,11 +41,6 @@ class Queue extends events.EventEmitter {
         this.emit('loggedOut', authData);
       }
     });
-
-    this.opts = Object.assign({
-      presenceDelay: DEFAULT_PRESENCE_DELAY,
-      maxWorker: DEFAULT_MAX_WORKER
-    }, options || {});
 
   }
 
@@ -255,7 +253,7 @@ class Queue extends events.EventEmitter {
     return this.claimTask(task).catch(
       () => Promise.reject(skip)
     ).then(
-      () => verifier.run(this.dockerClient, task.data.payload)
+      () => verifier.verify(this.dockerClient, task.data.payload, {logger: this.logger})
     ).then(results => {
       this.logger.info('Task ("%s") run.', task.key);
       this.logger.debug('Task ("%s") run: "%j".', task.key, results);
@@ -407,40 +405,6 @@ class Queue extends events.EventEmitter {
     return Promise.resolve();
   }
 
-}
-
-/**
- * Singpath Task queue
- * @param  {string} endpoint Full firbase URL to a SingPath queue.
- * @return {Queue}
- */
-exports.queue = (endpoint, dockerClient, logger) => new Queue(endpoint, dockerClient, logger);
-
-/**
- * Return a auth token generator.
- *
- * @param  {string} secret Firebase db secret.
- * @return {object}
- */
-exports.tokenGenerator = function tokenGenerator(secret) {
-  const generator = new FirebaseTokenGenerator(secret);
-
-  return {
-    /**
-     * Generate a custom auth token for a user
-     *
-     * @param  {string} uid Optional user uid.
-     * @return {string}     Auth token
-     */
-    user: (uid) => generator.createToken({uid: uid || uuid.v4(), isUser: true}),
-
-    /**
-     * Generate a custom auth token for verifier worker.
-     * @param  {string} queueName Queue name the worker is allow to work on.
-     * @return {[type]}           [description]
-     */
-    worker: (queueName) => generator.createToken({uid: uuid.v4(), isWorker: true, queue: queueName})
-  };
 };
 
 

@@ -3,6 +3,7 @@ FROM node:4.2-slim
 ENV SINGPATH_FIREBASE_SECRET=""
 ENV SINGPATH_FIREBASE_QUEUE="https://singpath-play.firebaseio.com/singpath/queues/default"
 ENV SINGPATH_PUSH_USER_ID="#1"
+ENV SKIP_BUILD="0"
 
 # Update npm, the docker client (for developpement) and create expected folders.
 RUN npm install npm -g && \
@@ -30,8 +31,9 @@ COPY ./src /app/src
 COPY ./tests /app/tests
 COPY ./bin /app/bin
 COPY ./verifiers /app/verifiers
-COPY .eslintrc images.json /app/
+COPY .eslintrc images.json entrypoint.sh /app/
 
 LABEL com.singpath.verifier="master"
 
-CMD ["/app/bin/verifier"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["/app/bin/verifier", "run", "-h"]

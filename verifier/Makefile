@@ -26,5 +26,5 @@ bash: build
 .PHONY: bash
 
 test: build
-	@docker run -ti --rm singpath/verifier2 npm test
+	@docker run -ti --rm -e SKIP_BUILD=1 singpath/verifier2 npm test
 .PHONY: test
