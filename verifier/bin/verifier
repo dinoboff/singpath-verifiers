@@ -371,7 +371,7 @@ function watch(q, auth, logger) {
 
   logger.info('Authenticating client...');
   return q.auth(token).then(
-    () => q.cleanUp()
+    () => q.reset()
   ).then(
     () => q.watch()
   ).catch(err => {

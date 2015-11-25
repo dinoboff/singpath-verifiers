@@ -1,11 +1,16 @@
 'use strict';
 
 const Firebase = require('firebase');
+var debounce = require('lodash.debounce');
+
+const noop = () => undefined;
+
 const FIFO = require('./fifo').FIFO;
 const verifier = require('./verifier');
 const events = require('events');
 
 const DEFAULT_PRESENCE_DELAY = 30000;
+const DEFAULT_TASK_TIMEOUT = 6000;
 const DEFAULT_MAX_WORKER = 10;
 
 
@@ -21,6 +26,7 @@ module.exports = class Queue extends events.EventEmitter {
     this.logger = options.logger || console;
     this.opts = {
       presenceDelay: options.presenceDelay || DEFAULT_PRESENCE_DELAY,
+      taskTimeout: options.taskTimeout || DEFAULT_TASK_TIMEOUT,
       maxWorker: options.maxWorker || DEFAULT_MAX_WORKER
     };
 
@@ -41,7 +47,6 @@ module.exports = class Queue extends events.EventEmitter {
         this.emit('loggedOut', authData);
       }
     });
-
   }
 
   get isLoggedIn() {
@@ -180,16 +185,13 @@ module.exports = class Queue extends events.EventEmitter {
    * To deal with Auth token expiring, you should listen for "watchStopped"
    * event and then restart watching with a new token.
    *
-   * TODO:
-   * - remove claimed event.
-   *
    * @return {Promise}
    */
   watch() {
-    this.tasksToRun = new FIFO();
-
     return this.registerWorker().then(deregister => {
       let cancel;
+
+      const stopWorkerWatch = this.monitorWorkers();
 
       const ref = this.taskRef.orderByChild('started').equalTo(false);
       const eventHandler = ref.on(
@@ -203,10 +205,13 @@ module.exports = class Queue extends events.EventEmitter {
       );
 
       cancel = () => {
-        ref.off(eventHandler);
         this.emit('watchStopped');
         this.logger.info('Watch on new task stopped.');
-        return deregister();
+        return Promise.all([
+          ref.off('child_added', eventHandler),
+          deregister(),
+          stopWorkerWatch()
+        ]);
       };
 
       this.emit('watchStarted', ref, cancel);
@@ -396,13 +401,86 @@ module.exports = class Queue extends events.EventEmitter {
    *
    * @return {Promise}.
    */
-  cleanUp() {
+  reset() {
     if (!this.isWorker) {
       return Promise.reject(new Error('The user is not logged in as a worker for this queue'));
     }
 
     this.tasksToRun.reset();
     return Promise.resolve();
+  }
+
+  /**
+   * Watch for worker failing to update their presence or to unclaim task.
+   *
+   * It will actually watch for worker which presence is older than this
+   * worker presence time (plus a margin); we cannot use the worker current time
+   * which could get out of sync.
+   * 
+   * @return {Function} function to cancel monitoring
+   */
+  monitorWorkers() {
+    let cancelWorkerWatch = noop;
+    let cancelTaskWatch = noop;
+
+    const presenceRef = this.workerRef.child(this.authData.uid).child('presence');
+    const presenceHandler = presenceRef.on('value', debounce(snapshot => {
+      const now = snapshot.val();      
+      this.logger.debug('Presence Time: %s', new Date(now));
+
+      cancelWorkerWatch();
+      cancelWorkerWatch = this.removeWorker(now - 2 * this.opts.presenceDelay);
+
+      cancelTaskWatch();
+      cancelTaskWatch = this.removeTaskClaims(now - 2 * this.opts.taskTimeout);
+
+    }, 1000));
+
+    return () => {
+      presenceRef.off('value', presenceHandler);
+      cancelWorkerWatch();
+      cancelTaskWatch();
+    };
+  }
+
+  removeWorker(olderThan) {
+    this.logger.debug('Removing worker older than %s...', new Date(olderThan));
+    
+    const query = this.workerRef.orderByChild('presence').endAt(olderThan).limitToFirst(1);
+    const handler = query.on('child_added', snapshot => {
+      const key = snapshot.key();
+
+      this.logger.debug('Removing old worker %s...', key);
+
+      snapshot.ref().remove(err => {
+        if (err) {
+          this.logger.error('Failed to remove worker "%s": %s', key, err.toString());
+        } else {
+          this.logger.info('Worker "%s" removed', key);
+        }
+      });
+    });
+
+    return () => query.off('child_added', handler);
+  }
+
+  removeTaskClaims(claimedBefore) {
+    this.logger.debug('Removing claims on task older than %s...', new Date(claimedBefore));
+
+    const query = this.taskRef.orderByChild('completed').equalTo(false);
+    const handler = query.on('child_added', snapshot => {
+      const val = snapshot.val();
+
+      if (!val.started || val.startedAt > claimedBefore) {
+        return;
+      }
+
+      const key = snapshot.key();
+      this.logger.debug('Removing old claim on %s...', key);
+      this.removeTaskClaim({key});
+    });
+
+    return () => query.off('child_added', handler);
   }
 
 };
