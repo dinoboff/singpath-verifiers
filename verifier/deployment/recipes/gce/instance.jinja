@@ -61,6 +61,7 @@ resources:
           sudo docker pull singpath/verifier2-javascript:latest
           sudo docker run -d \
             --name "$SINGPATH_CONTAINER" \
+            --restart=always \
             -v /var/run/docker.sock:/var/run/docker.sock \
             --group-add $DOCKER_GROUP_ID \
             -e SKIP_BUILD="1" \
