@@ -36,4 +36,4 @@ COPY .eslintrc images.json entrypoint.sh /app/
 LABEL com.singpath.verifier="master"
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["/app/bin/verifier", "run", "-h"]
+CMD ["/app/bin/verifier", "run"]
