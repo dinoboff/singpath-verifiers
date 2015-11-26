@@ -67,7 +67,6 @@ function testSolution(solution, tests, opts) {
       if (code) {
         resolve({solved: false, errors: err});
       } else {
-        console
         resolve(JSON.parse(out));
       }
     });

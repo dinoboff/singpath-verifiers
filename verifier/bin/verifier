@@ -3,17 +3,18 @@
 'use strict';
 
 const argparse = require('argparse');
+const expect = require('expect.js');
 const Firebase = require('firebase');
 const FirebaseTokenGenerator = require('firebase-token-generator');
 const path = require('path');
 const prompt = require('prompt');
+const spawn = require('child_process').spawn;
 const url = require('url');
 const yaml = require('js-yaml');
-const spawn = require('child_process').spawn;
 
+const fs = require('../src/promiseFs');
 const packageJson = require('../package.json');
 const verifier = require('../');
-const fs = require('../src/promiseFs');
 
 const ERROR_NO_ENDPOINT = 'A endpoint is required.';
 const ERROR_NO_SECRET = 'A firebase auth secret is required.';
@@ -107,7 +108,7 @@ const cmd = {
   push(args, logger) {
 
     logger.info('parsing yaml encoded solutions');
-    const solutions = loadSolutions(args.payload, logger);
+    const solutions = loadSolutions(args.payload, {logger});
 
     if (solutions.length < 0) {
       logger.error('no solution to push');
@@ -154,6 +155,24 @@ const cmd = {
         return buildImage(image, logger);
       });
     }, Promise.resolve());
+  },
+
+  test(args, logger) {
+    const solutions = loadSolutions(args.payload, {logger});
+
+    if (solutions.length < 0) {
+      logger.error('no solution to test.');
+      process.exit(132);
+    }
+
+    verifier.dockerClient(args).then(client => {
+      return testSolutions(client, solutions, logger);
+    }).then(
+      () => logger.info('Tests run successfully.')
+    ).catch(err => {
+      logger.error('%s', err.toString());
+      process.exit(133);
+    });
   }
 };
 
@@ -266,6 +285,14 @@ function parseArgs(defaults, args) {
     formatterClass: argparse.RawTextHelpFormatter,
     epilog: EPILOG
   });
+  const testParser = subparsers.addParser('test', {
+    addHelp: true,
+    description: (
+      'Test verifier images against a yaml encoded array of solution'
+    ),
+    formatterClass: argparse.RawTextHelpFormatter,
+    epilog: EPILOG
+  });
 
   [runParser, pushParser, settingsParser].forEach(parser => {
     parser.addArgument(['-e', '--endpoint' ], {
@@ -284,12 +311,24 @@ function parseArgs(defaults, args) {
   });
 
   runParser.setDefaults({func: requireSecret(cmd.run)});
+
   pushParser.setDefaults({func: requireSecret(cmd.push)});
   pushParser.addArgument(['payload'], {
     help: 'JSON or YAML payload to push; \nmust include `language`, `tests` and `solution`'
   });
+
   settingsParser.setDefaults({func: cmd.settings});
+
   buildParser.setDefaults({func: cmd.build});
+
+  testParser.addArgument(['payload'], {
+    help: (
+      'YAML encoded payload; \n' +
+      'each solution must include `language`, `tests`, `solution` and `expected`; \n' +
+      '`expected` must match the result of the verifier.'
+    )
+  });
+  testParser.setDefaults({func: cmd.test});
 
   return parser.parseArgs(args);
 }
@@ -380,15 +419,17 @@ function watch(q, auth, logger) {
   });
 }
 
-function loadSolutions(yamlString, logger) {
+function loadSolutions(yamlString, options) {
   let docs = [];
+  const logger = options.logger || console;
 
   logger.info('Parsing solutions to push...');
   logger.debug(yamlString);
   yaml.safeLoadAll(yamlString, doc => {
-    let language = doc.language;
-    let tests = doc.tests;
-    let solution = doc.solution;
+    const language = doc.language;
+    const tests = doc.tests;
+    const solution = doc.solution;
+    const expected = doc.expected;
 
     if (!language || !tests || !solution) {
       logger.error(
@@ -398,7 +439,7 @@ function loadSolutions(yamlString, logger) {
       return;
     }
 
-    docs.push({language, tests, solution});
+    docs.push({language, tests, solution, expected});
   });
 
   return docs;
@@ -407,6 +448,8 @@ function loadSolutions(yamlString, logger) {
 function pushSolutions(q, solutions, logger) {
   let operations = solutions.map(payload => {
     logger.info('Pushing solution... ');
+    delete payload.expected;
+
     return q.pushToQueue(payload).then(
       ref => logger.info('Solution pushed at %s', ref.toString())
     );
@@ -422,6 +465,25 @@ function pushSolutions(q, solutions, logger) {
   ).then(
     () => failure
   );
+}
+
+function testSolutions(dockerClient, solutions, logger) {
+  return solutions.reduce((chain, solution) => {
+    const language = solution.language;
+    const tests = solution.tests;
+    const sol = solution.solution;
+    const expected = solution.expected;
+
+    return chain.then(() => {
+      const s = {language, tests, solution: sol};
+
+      logger.info('Running "%s"...', JSON.stringify(s, null, '  '));
+
+      return verifier.verify(dockerClient, s, {logger});
+    }).then(
+      result => expect(result).to.eql(expected)
+    );
+  }, Promise.resolve());
 }
 
 function buildImage(image, logger) {
