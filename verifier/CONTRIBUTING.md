@@ -98,9 +98,9 @@ docker build -t singpath/verifier2:latest .
 docker run -ti --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --group-add 100 \
-    -e SINGPATH_FIREBASE_SECRET="firebase-secret" \
+    -e SINGPATH_FIREBASE_SECRET="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
     -e SINGPATH_FIREBASE_ENDPOINT="https://singpath-play.firebaseio.com/singpath/queues/default" \
-    singpath/verifier2
+    singpath/verifier2:latest
 ```
 
 Running the verifier in a docker machine saves installing node on the server.
