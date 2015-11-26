@@ -2,119 +2,104 @@
 
 Pull verifier task from a Firebase queue and run them inside container.
 
-## Requirements
+It consists of a daemon watching for task added to
+`https://some-firebase-id.firebaseio.com/singpath/queues/default/tasks`,
+and of docker verifier images, one for each language supported.
 
-- a Firebase DB and its Auth secret;
-- docker;
-- [git](https://git-scm.com/);
-- nodejs 4; you can use [nvm](https://github.com/creationix/nvm) to manage
-  multiple versions of node.
-- bash;
-- make;
+A task will be run in a one-time-use container; the results will be written
+to `https://some-firebase-id.firebaseio.com/singpath/queuedSolutions/pathId/levelId/problemId/user-public-id/default/results/taskId`.
 
-OS X includes git, make and bash. The git package for windows should include
-bash and make.
-
-On OS X and Windows, you should install
-[Docker Tools](https://www.docker.com/docker-toolbox); it will include
-docker, docker-machine and VirtualBox.
-
-To create new docker machine if you have:
-```shell
-docker-machine create -d virtualbox default
-```
-
-Then start the docker machine:
-```shell
-docker-machine start default
-eval $(docker-machine env default)
-```
-
-In every terminal, configure docker the use that machine:
-```shell
-eval $(docker-machine env default)
-```
 
 ## Development
 
-Clone the repository and install node dependencies:
+- [verifier daemon](./CONTRIBUTING.md);
+- [verifiers images](./verifiers/README.md)
+
+
+## Deployment with `docker-machine`
+
+`docker-machine` configure docker on a remote server which might include
+creating a new VM, booting it up and installing docker, and allows you to manage
+their containers remotely with your local docker client.
+
+Using `docker-machine` is a simple way to boot up a docker host but doesn't allow
+to easily share the control of the machine. It's best suited for verifier
+needing to run temporally.
+
+The deployment script works with a local docker host as well. You can use it
+on any server with docker 1.6+ installed and running; you would just skip the
+first two steps in the example bellow.
+
+
+### Requirements
+
+- [python 2.7](https://www.python.org/downloads/);
+- [docker](https://docs.docker.com/engine/installation/);
+- [docker-machine](https://docs.docker.com/machine/install-machine/);
+- `curl` in this example, but you can use any other way to download our
+  python deployment script: wget, a browser or clone this repository.
+
+`docker-machine` is the recommended way to run Docker on OS X and Windows via
+VirtualBox driver. You can install `docker` and `docker-machine` using
+[Docker Tools](https://www.docker.com/docker-toolbox).
+
+
+### Using GCE
+
+`docker-machine` has [driver](https://docs.docker.com/machine/drivers/)
+for many VM provider we will use Google Cloud Engine in this example.
+
+1. Create a new docker host:
+        ```shell
+        export PROJECT_ID="your-google-project-id"
+        docker-machine create --driver google \
+            --google-project $PROJECT_ID \
+            --google-zone us-central1-a \
+            --google-machine-type f1-micro \
+            remote-docker
+        ```
+
+2. In all your terminals, set your docker client to use this docker machine:
+        ```shell
+        eval "$(docker-machine env remote-docker)"
+        ```
+
+3. Download the verifier client:
+        ```shell
+        curl -O https://raw.githubusercontent.com/singpath/verifier/master/deployment/verifier-machine.py
+        chmod +x verifier-machine.py
+        ```
+
+4. Pull the verifier images:
+        ```shell
+        ./verifier-machine pull latest
+        ```
+
+5. Start the verifier daemon on the remote docker machine:
+        ```shell
+        ./verifier-machine start \
+            --docker-group 999 \
+            --firebase-auth-secret xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+            --firebase-id some-firebase-id \
+            --firebase-queue default \
+            --interactive
+        ```
+
+Instead of passing those arguments in the command line, you save them in
+`./.singpath-verifiers.json` as a profile. `./.singpath-verifiers.json` can
+save multiple set of settings to target different firebase db, queue or machine.
+
+To setup a profile run:
 ```shell
-git clone https://github.com/ChrisBoesch/singpath-verifiers.git
-cd singpath-verifiers.git
-npm install
+./verifier-machine init some-id
 ```
 
-To run the queue worker:
+Then to start the daemon container:
 ```shell
-./bin/verifier build-verifiers
-./bin/verifier run  \
-	-e https://some-firebase-id.firebaseio.com/singpath/queues/default \
-	--promtp-secret
+./verifier-machine start \
+    --profile-id some-id \
+    --interactive
 ```
 
-	Note:
-
-	You can save the secret and endpoint in a .singpathrc json file. Run
-	`./bin/verifier -h` for more information.
-
-
-To push task to the queue:
-```shell
-./bin/verifier push \
-	-e https://some-firebase-id.firebaseio.com/singpath/queues/default \
-	--promtp-secret \
-	'---
-language: python,
-tests: |
-  >>> foo
-  1
-solution: |
-  foo = 1
-'```
-
-
-	Note:
-
-	You could push the content of a file with
-	`./bin/verifier push "$(cat solutions.yaml)"`.
-
-
-## Deployment with docker-machine
-
-You can use docker-machine to start a remote virtual machine, install docker
-on it and and manage container using you local docker client.
-
-The verifier daemon can run inside a container. The host docker socket just
-need be share with verifier daemon container.
-
-A verifier will need read/write access to the socket and the Firebase secret.
-By default, the socket group is "docker" and assuming the docker group ID was
-100, to run verifier watching the default queue, you would start the verifier
-container with this command:
-
-```shell
-docker build -t singpath/verifier2 .
-docker run -ti --rm \
-	-v /var/run/docker.sock:/var/run/docker.sock \
-	--group-add 100 \
-	-e SINGPATH_FIREBASE_SECRET="firebase-secret" \
-	-e SINGPATH_FIREBASE_ENDPOINT="https://singpath-play.firebaseio.com/singpath/queues/default" \
-	singpath/verifier2
-```
-
-Running the verifier in a docker machine would also save installing node on the
-server.
-
-### Group ID
-
-To find the group ID to add:
-- on OS X or windows, connect to the docker host: `docker-machine ssh default`.
-- check the group assigned to `/var/run/docker.sock`: `ls -l /var/run/docker.sock.
-- find the group id in `/etc/group`: cat /etc/group
-
-On docker-machine hosts, the group id should be "100".
-
-### TODO
-
-- add support for Firebase Auth token directly instead of a Firebase secret.
-- publish rules for the DB.
+You would remove `--interactive` argument to let the container run in daemon
+mode and `./verifier-machine stop --profile-id remote-docker` to stop it.

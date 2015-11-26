@@ -1,6 +1,6 @@
 # singpath-verifiers
 
-The docker-based verifiers that support SingPath.com
+The docker-based verifiers that support SingPath.com.
 
 
 ## Requires
@@ -228,8 +228,4 @@ To push a file content, you could use:
 
 ## TODO
 
-- setup [circleci.com](https://circleci.com/docs/docker) continuous tests.
-- clean up after failing or exiting verifier worker.
-- implement python and javascript verifier (simply switch the current verifiers server
-  api for a cli).
-- Build language verifier from daemon container.
+- setup continuous integration tests.

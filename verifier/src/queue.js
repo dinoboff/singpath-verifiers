@@ -1,7 +1,9 @@
 'use strict';
 
 const Firebase = require('firebase');
-var debounce = require('lodash.debounce');
+const debounce = require('lodash.debounce');
+const once = require('lodash.once');
+
 
 const noop = () => undefined;
 
@@ -9,9 +11,11 @@ const FIFO = require('./fifo').FIFO;
 const verifier = require('./verifier');
 const events = require('events');
 
+const DEFAULT_MAX_WORKER = 10;
+
+// TODO: should be saved in FB db and shared between verifiers.
 const DEFAULT_PRESENCE_DELAY = 30000;
 const DEFAULT_TASK_TIMEOUT = 6000;
-const DEFAULT_MAX_WORKER = 10;
 
 
 module.exports = class Queue extends events.EventEmitter {
@@ -189,35 +193,61 @@ module.exports = class Queue extends events.EventEmitter {
    */
   watch() {
     return this.registerWorker().then(deregister => {
-      let cancel;
+      let cancel = noop;
 
-      const stopWorkerWatch = this.monitorWorkers();
+      const failureHandler = once(err => {
+        this.emit('watchStopped', err);
+        this.logger.error('Watch on new task failed unexpectively: %s', err.toString());
+        cancel();
+      });
 
-      const ref = this.taskRef.orderByChild('started').equalTo(false);
-      const eventHandler = ref.on(
-        'child_added',
-        snapshot => this.sheduleTask(snapshot.key(), snapshot.val()),
-        err => {
-          this.emit('watchStopped', err);
-          this.logger.error('Watch on new task failed unexpectively: %s', err.toString());
-          return deregister();
-        }
-      );
+      const stopWorkerWatch = this.monitorWorkers(failureHandler);
+      const stopAddedTaskWatch = this.monitorAddedTask(failureHandler);
+      const stopUpdatedTaskWatch = this.monitorUpdatedTask(failureHandler);
 
       cancel = () => {
         this.emit('watchStopped');
         this.logger.info('Watch on new task stopped.');
+
         return Promise.all([
-          ref.off('child_added', eventHandler),
-          deregister(),
-          stopWorkerWatch()
-        ]);
+          deregister, stopWorkerWatch, stopAddedTaskWatch, stopUpdatedTaskWatch
+        ].map(fn => {
+          try {
+            return fn();
+          } catch (e) {
+            return Promise.reject(e);
+          }
+        }));
       };
 
-      this.emit('watchStarted', ref, cancel);
+      this.emit('watchStarted', cancel);
       this.logger.info('Starting watching for new task.');
       return cancel;
     });
+  }
+
+  monitorAddedTask(failHandler) {
+    const query = this.taskRef.orderByChild('started').equalTo(false);
+    const handler = query.on('child_added', snapshot => {
+      this.sheduleTask(snapshot.key(), snapshot.val());
+    }, failHandler);
+
+    return () => query.off('child_added', handler);
+  }
+
+  monitorUpdatedTask(failHandler) {
+    const query = this.taskRef.orderByChild('started').equalTo(false);
+    const handler = query.on('child_changed', snapshot => {
+      const val = snapshot.val();
+
+      if (val.started) {
+        return;
+      }
+
+      this.sheduleTask(snapshot.key(), val);
+    }, failHandler);
+
+    return () => query.off('child_added', handler);
   }
 
   /**
@@ -416,7 +446,7 @@ module.exports = class Queue extends events.EventEmitter {
    * It will actually watch for worker which presence is older than this
    * worker presence time (plus a margin); we cannot use the worker current time
    * which could get out of sync.
-   * 
+   *
    * @return {Function} function to cancel monitoring
    */
   monitorWorkers() {
@@ -425,7 +455,7 @@ module.exports = class Queue extends events.EventEmitter {
 
     const presenceRef = this.workerRef.child(this.authData.uid).child('presence');
     const presenceHandler = presenceRef.on('value', debounce(snapshot => {
-      const now = snapshot.val();      
+      const now = snapshot.val();
       this.logger.debug('Presence Time: %s', new Date(now));
 
       cancelWorkerWatch();
@@ -445,7 +475,7 @@ module.exports = class Queue extends events.EventEmitter {
 
   removeWorker(olderThan) {
     this.logger.debug('Removing worker older than %s...', new Date(olderThan));
-    
+
     const query = this.workerRef.orderByChild('presence').endAt(olderThan).limitToFirst(1);
     const handler = query.on('child_added', snapshot => {
       const key = snapshot.key();
